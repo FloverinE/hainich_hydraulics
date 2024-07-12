@@ -5,7 +5,7 @@ image <- image_transparent(fasy01_40,
                 "white", 
                 fuzz = 30)
 
-image |> as.data.frame()
+image |> as.data.frame() 
 
 # Let's assume `image` is your magick image object
 
