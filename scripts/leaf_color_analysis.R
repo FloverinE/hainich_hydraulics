@@ -1,6 +1,6 @@
 library(magick)
 library(tidyverse)
-fasy01_40 <- magick::image_read("data/fasy01_40.tif")
+fasy01_40 <- magick::image_read("temp_treatment/fasy01_40.tif")
 image <- image_transparent(fasy01_40, 
                 "white", 
                 fuzz = 30)
@@ -47,10 +47,10 @@ df <- data.frame(
 df_long <- df |> mutate(sum = rowSums(df))
 
 df_long <- df |> 
-  filter(sum != 765) |> 
+  filter("sum" != 765) |> 
   pivot_longer(cols = c("r", "g", "b"), names_to = "channel", values_to = "value")
 
-ggplot(df_long, aes(x = value, fill = channel)) +
+ggplot(df_long |> filter(value != 255), aes(x = value, fill = channel)) +
   geom_histogram(binwidth = 1, position = "identity", alpha = 0.5) +
   scale_fill_manual(values = c("red", "green", "blue")) +
   labs(title = "Color Histogram", x = "Color Value", y = "Frequency") +
@@ -70,7 +70,7 @@ f_tgi = function(row) {
 }
 
 leaf1 <- df |> 
-  filter(sum != 765) 
+  filter("sum" != 765) 
 
 f_tgi = function(row) {
   tgi = ((row[2] - row[1]) + (row[2] - row[3])) / 2
@@ -78,6 +78,12 @@ f_tgi = function(row) {
 }
 
 f_tgi(c(0, 255, 0))
+f_tgi(c(255, 255, 255))
+f_tgi(c(0, 255, 0))
+
 
 plot(1,1, col = rgb(255, 255, 100, maxColorValue = 255), pch = 19, cex = 10)
 plot(1,1, col = rgb(255, 255, 190, maxColorValue = 255), pch = 19, cex = 10)
+
+
+
