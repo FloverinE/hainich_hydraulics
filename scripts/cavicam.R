@@ -8,16 +8,16 @@ library(scam)
 
 # load data ---------------------------------------------------------------
 
-df_water_potential <- read.csv("cavicam/2024_psi_all.csv")
+df_water_potential <- read.csv("data/cavicam/2024_psi_all.csv")
 
-df_area <- read.csv("cavicam/2024_cavicam_all.csv")
+df_area <- read.csv("data/cavicam/2024_cavicam_all.csv")
 
 
 # prepare cavitated area --------------------------------------------------
 
 folder <- "Q:/cavicam/"
 
-files <- list.files("cavicam/camp2/", pattern = "\\.csv", full.names = T)
+files <- list.files("Q:/cavicam/camp3/", pattern = "all_vessels_qnd.csv", full.names = T)
 
 df_area <- files %>%
   map_df(read_csv, .id = "sample_ID") 
@@ -25,7 +25,7 @@ df_area <- files %>%
 df_area <- files %>%
   set_names(nm = basename(.)) %>%
   map_df(read_csv, .id = "sample_ID") |> 
-  rename(id = "X" ) 
+  rename(id = "...1" ) 
 
 
 df_area <- df_area |> 
@@ -35,19 +35,36 @@ df_area <- df_area |>
          sample_ID = sample_ID |> str_remove_all("\\.csv"),
          minutes = id * 5 - 5) ## 1 picture every 5 minutes 
 
+df_camp3 <- df_area 
+
+df_camp3 <- df_camp3 |> 
+  mutate(vessel_order = "all",
+         sample_ID = sample_ID |> str_remove_all("_all_vessels_qnd") |> toupper(),
+         campaign = "3",
+         year = 2024,
+         date = "2024-08-13")
+
 df_area |> 
   ggplot() +
   geom_line(aes(x = minutes, y = perc_area_cav, group = sample_ID, color = sample_ID)) +
   theme_bw()
 
-df_camp1 <- df_area 
-df_camp2 <- df_area
-df_area <- rbind.data.frame(df_camp1, df_camp2)
-write.csv(df_area, "cavicam/2024_cavicam_all.csv", row.names = F)
+
+
+  
+
+df_area <- read.csv("data/cavicam/2024_cavicam_all.csv")
+
+df_area <- df_area |> 
+  mutate(vessel_order = "all")
+
+df_area <- rbind.data.frame(df_area, df_camp3)
+
+write.csv(df_area, "data/cavicam/2024_cavicam_all.csv", row.names = F)
 
 # prepare water potential ----------------------------------------------
 
-lst <- lapply(2:9, function(i) readxl::read_excel("cavicam/camp1/camp1_psi.xlsx", sheet = i))
+lst <- lapply(2:9, function(i) readxl::read_excel("data/cavicam/camp3/camp3_psi.xlsx", sheet = i))
 
 # coerce list to df
 df_cavi <- do.call(rbind.data.frame, lst)
@@ -59,21 +76,19 @@ df_cavi <- df_cavi |>
 df_cavi <- df_cavi |> 
   group_by(sample_ID) |> 
   mutate(minutes = difftime(start_measurement, min(start_measurement), units = "mins") |> as.numeric(),
-         campaign = "1") |> 
+         campaign = "3") |> 
   ungroup()
 
 df_cavi$drying_interval[df_cavi$drying_interval < 1] = NA
 
-df_cavi
+df_cavi_camp3 <- df_cavi
 
-write.csv(df_cavi, "cavicam/2024_camp1_psi_long.csv", row.names = F)
+df_cavi <- read.csv("data/cavicam/2024_psi_all.csv")
 
-df_cavi1 <- read.csv("cavicam/2024_camp1_psi_long.csv")
-df_cavi2 <- read.csv("cavicam/2024_camp2_psi_long.csv")
+df_cavi <- rbind.data.frame(df_cavi, df_cavi_camp3)
 
-df_cavi <-   rbind.data.frame(df_cavi1, df_cavi2)
+write.csv(df_cavi, "data/cavicam/2024_psi_all.csv", row.names = F)
 
-write.csv(df_cavi, "cavicam/2024_psi_all.csv", row.names = F)
 
 
 

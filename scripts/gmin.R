@@ -39,10 +39,14 @@ ggplot(df_gmin) +
   facet_wrap(~ sample_id) +
   theme_bw()
 
-ggplot(df_gmin) + 
-  geom_line(aes(x = elapsed_time_min, y = gmin, group = campaign, col = as.factor(campaign)), linewidth = 1) +
+ggplot(df_gmin |> filter(rwc > 70 & rwc < 90)) + 
+  geom_path(aes(x = rwc, y = gmin, group = campaign, col = as.factor(campaign)), linewidth = 1) +
+  facet_wrap(~ sample_id, scales = "free") +
+  theme_bw()
+
+ggplot(df_gmin |> filter(elapsed_time_min < 750)) + 
+  geom_line(aes(x = elapsed_time_min, y = rwc, group = campaign, col = as.factor(campaign)), linewidth = 1) +
   facet_wrap(~ sample_id) +
-  ylim(0, 3) +
   theme_bw()
 
 # Gmin calculation --------------------------------------------------------
@@ -106,9 +110,36 @@ df_gmin_camp2 <- df_gmin_camp2 |>
          campaign = "2")
 
 camp2_leaf_area <- readxl::read_excel("data/gmin/02_gmin.xlsx", sheet = 1)
-df_gmin_camp2 <- df_gmin_camp2 |> left_join(camp2_leaf_area, by = "Sample_ID")
 
-df_gmin <- rbind(df_gmin_camp1, df_gmin_camp2)
+## campaign 3
+camp3_gmin <-
+  lapply(2:9, function(x) readxl::read_excel("data/gmin/03_gmin.xlsx", sheet = x))
+
+df_gmin_camp3 <- do.call(rbind.data.frame, camp3_gmin) |>
+  fill(
+    c(Sample_ID,
+      Date,
+      Start_Time,
+      Real_Time,
+      Leaf_Mass_No_Wax ,
+      Petri_Dish_Mass),
+    .direction = "down"
+  )
+
+
+df_gmin_camp3 <- df_gmin_camp3 |> 
+  mutate(Date = format(Date, "%Y-%m-%d"),
+         Start_Time = paste(Date, format(Start_Time, "%H:%M:%S")) |> as.POSIXct(),
+         Real_Time = paste(Date, format(Real_Time, "%H:%M:%S")) |> as.POSIXct(),
+         campaign = "3")
+
+camp3_leaf_area <- readxl::read_excel("data/gmin/03_gmin.xlsx", sheet = 1)
+
+df_gmin_camp3<- df_gmin_camp3 |> left_join(camp3_leaf_area, by = "Sample_ID")
+
+
+## bind all 
+df_gmin <- rbind(df_gmin_camp1, df_gmin_camp2, df_gmin_camp3)
 
 
 df_gmin <- df_gmin |> 
