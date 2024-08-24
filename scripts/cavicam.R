@@ -101,8 +101,13 @@ scamfun <- function(water_potential, area){
 }
 
 
+scamfun(
+  df_water_potential_nest$water_potential[[24]], 
+        df_area_nest$area[[24]]
+        )
+
 df_area_nest <- df_area |> mutate(all_id = paste(campaign, sample_ID, sep = "_")) |> 
-  nest(data = -c(all_id, campaign)) |> 
+  nest(data = -c(all_id)) |> 
   rename("area" = "data")
 
 df_water_potential_nest <- df_water_potential |> mutate(all_id = paste(campaign, sample_ID, sep = "_")) |> 
@@ -112,6 +117,8 @@ df_water_potential_nest <- df_water_potential |> mutate(all_id = paste(campaign,
 df_all <- left_join(df_area_nest, df_water_potential_nest, by = "all_id")
 
 df_all <- df_all |> 
+  filter(all_id != "3_FREX_06") |>
+  filter(all_id != "3_FREX_08") |>
   mutate(psi_pred = map2(water_potential, area, scamfun),
          area = map2(area, psi_pred, ~mutate(.x, psi_pred = .y)))
 
@@ -170,14 +177,21 @@ pfit
 # (which is 1.0 where PLC = 0). For plotting options, see ?plot.plcfit
 plot(pfit)
 
-df_FASY_01 <- df_area |> 
-  filter(sample_ID == "FASY_01", psi_pred_MPa > -6) |> 
+df_test <- df_area |> filter(sample_ID == "FASY_01", 
+                  # campaign == "3",
+                  psi_pred_MPa > -6) |> 
   mutate(perc_area_cav = perc_area_cav * 100)
 
-pfit_cc <- fitplc(df_FASY_01, varnames=c(PLC="perc_area_cav", WP="psi_pred_MPa"), nboot=50, model="sigmoid")
+pfit_cc <- fitplcs(df_area |> 
+                     mutate(species = substr(sample_ID, 1, 4)), 
+                  varnames=c(PLC="perc_area_cav", WP="psi_pred_MPa"),
+                  group = "species",
+                  random = "campaign",
+                  nboot=100, 
+                  model="sigmoid")
 pfit_cc |> plot()
 
-
+pfit_cc |> summary()
 
 # fit all species ---------------------------------------------------------
 
@@ -219,6 +233,171 @@ all_fit_species <- fitplcs(df_camp1, "sample_ID", varnames=c(PLC="perc_area_cav"
 plot(all_fit_species, onepanel=TRUE, plotci=FALSE, px_ci="none", pxlinecol="dimgrey")
 all_fit_species$FASY_01$fit 
 
+
+
+
+# nlme for plc fit --------------------------------------------------------
+
+library(nlme)
+f.plc <- function(x, a, b, c, d) {
+  a + (b - a) / (1 + exp(c * (d - x)))
+}
+
+fitplc::fweibull
+f.weibull_plc <- function (P, SX, PX, X = 50) 
+{
+  X <- X[1]
+  V <- (X - 100) * log(1 - X/100)
+  p <- (P/PX)^((PX * SX)/V)
+  relk <- (1 - X/100)^p
+  return(relk)
+}
+
+f.weibull_plc
+
+f.weibull_plc <- formula(perc_area_cav ~ 1 - exp(-(psi_pred_MPa / a) ^ b))
+
+# cumulative weibull function
+f.weibull <- function(x, a, b) {
+  1 - exp(-(x / a) ^ b)
+}
+
+mod1 <- nlme(perc_area_cav ~ f.plc(psi_pred_MPa, a, b, c, d),
+             data = df_FASY_01,
+             fixed = a + b + c + d ~ 1,
+             random = a ~ 1 | campaign,
+             start = c(a = 0, b = 100, c = 1, d = -1),
+             control = list(msMaxIter = 2000))
+
+
+# P is (positive-valued) xylem water potential (i.e. P = −Ψ)
+# PX, pressure at X% loss of conductivity
+# SX is the slope of the Weibull function at P = 0
+# ksat, saturated hydraulic conductivity
+
+# Relative conductance/conductivity to PLC.
+# relk_to_plc <- function(relk)100 - 100*relk
+
+# PLC to relative conductance/conductivity.
+
+plc_to_relk <- function(plc)(100 - plc)/100
+
+df_test$relk = plc_to_relk(df_test$perc_area_cav)
+
+
+f.weibull = function (P, SX, PX, X = 50) {
+  X = X[1]
+  V = (X - 100) * log(1 - X/100)
+  p = (P/PX)^((PX * SX)/V)
+  relk = (1 - X/100)^p
+  return(relk)
+}
+f.weibull(10, SX, PX, X = 50)
+
+fitplc(df_test,
+       varnames=c(PLC="perc_area_cav", WP="psi_pred_MPa"),
+       nboot=50,
+       model="Weibull")
+
+pfit_cc$data
+
+nls(relK ~ fweibull(P, SX, PX, X = 50),
+    data = pfit_cc$data,
+    start = list(SX = 124.587305, PX = 4.227376),
+    control = nls.control(maxiter = 1000))
+    
+
+df_test$psi_pred_MPa
+
+fsigmoidal(df_test$psi_pred_MPa, 124, 4, 50)
+    
+nls(relk ~ f.weibull(-psi_pred_MPa, SX, PX, X = 50),
+    data = df_test,
+    start = list(SX = 124, PX = 4),
+    control = nls.control(maxiter = 1000))
+
+f.weibull(df_test$psi_pred_MPa, 124, 4, X = 50)
+
+
+relk ~ (1 - X/100)^p
+relk ~ (1 - X/100)^(P/PX)^((PX * SX)/V)
+relk ~ (1 - X/100)^(P/PX)^((PX * SX)/(X - 100) * log(1 - X/100))
+
+X = 50
+
+
+
+
+df_test <- df_area |> filter(sample_ID == "FASY_01", 
+                  campaign == "3",
+                  psi_pred_MPa > -6) |> 
+  mutate(perc_area_cav = perc_area_cav * 100)
+
+mod2 <- nls(
+  relk ~ (1 - X / 100) ^ ((-psi_pred_MPa / PX) ^ ((PX * SX) / (X - 100) * log(1 - X / 100))),
+  data = df_test,
+  # fixed = SX + PX ~ 1,
+  # random = b ~ 1 | campaign,
+  start = list(SX = 124, PX = 4),
+  control = nls.control(maxiter = 1000)
+)
+
+df_test2 <- df_area |> filter(sample_ID == "FASY_03", psi_pred_MPa > -6) |>
+  mutate(perc_area_cav = perc_area_cav * 100,
+         relK = plc_to_relk(perc_area_cav))
+
+
+
+mod3 <- nlme(
+  relK ~ fweibull(-psi_pred_MPa, SX, PX, X = 50),
+  data = df_test2,
+  fixed = list(SX ~1, PX ~ 1),
+  random = SX + PX ~ 1 | campaign,
+  start = list(fixed = c(SX = 124, PX = 4)),
+  control = nlmeControl(maxiter = 1000, msMaxIter = 2000)
+)
+
+
+ggplot(df_test2) +
+  geom_point(aes(x = -psi_pred_MPa, y = relK, col = campaign)) +
+  geom_path(aes(x = -psi_pred_MPa, y = predict(mod3), col = campaign, group = campaign)) +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))
+
+
+mod3 <- nlme(
+  relK ~ fweibull(-psi_pred_MPa, SX, PX, X = 50),
+  data = df_area |> filter(psi_pred_MPa > -6) |>
+    mutate(perc_area_cav = perc_area_cav * 100,
+           relK = plc_to_relk(perc_area_cav), 
+           species = substr(sample_ID, 1, 4)),
+  fixed = list(SX ~ 1, PX ~ 1),
+  random = SX + PX ~ 1 | species/campaign,
+  start = list(fixed = c(SX = 124, PX = 4)),
+  control = nlmeControl(maxiter = 1000, msMaxIter = 2000)
+)
+
+df_area |> filter(psi_pred_MPa > -10) |>
+  mutate(perc_area_cav = perc_area_cav * 100,
+         relK = plc_to_relk(perc_area_cav), 
+         species = substr(sample_ID, 1, 4)) |>
+  modelr::add_predictions(mod3, var = "pred_nlme") |>
+  ggplot() +
+  geom_point(aes(
+    x = -psi_pred_MPa,
+    y = relK,
+    # col = sample_ID,
+    # group = sample_ID,
+  ), col = "grey", size = 0.5) +
+  geom_line(aes(
+    x = -psi_pred_MPa, y = pred_nlme,
+    col = campaign, group = campaign
+  ), linewidth = 1) +
+  facet_wrap( ~ species) +
+  ylab("Relative conductivity") +
+  xlab("Water potential (MPa)") +
+  theme_minimal() 
+  
 
 # preprocess images for faster loading into imagej ------------------------
 library(magick)
@@ -288,6 +467,4 @@ write.excel <- function(x,
     sep = "\t",
     row.names = row.names,
     col.names = col.names,
-    ...
-  )
-}
+    .
