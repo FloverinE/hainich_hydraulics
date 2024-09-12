@@ -1,11 +1,23 @@
 
 # Setup -------------------------------------------------------------------
-
-library(tidyverse)
-# library(openxlsx)
-library(scam)
-
-
+{
+  library(tidyverse)
+  # library(openxlsx)
+  library(scam)
+  
+  write.excel <- function(x,
+                          row.names = FALSE,
+                          col.names = FALSE,
+                          ...) {
+    write.table(
+      x,
+      "clipboard-2048",
+      sep = "\t",
+      row.names = row.names,
+      col.names = col.names,
+    )
+  }
+}
 # load data ---------------------------------------------------------------
 
 df_water_potential <- read.csv("data/cavicam/2024_psi_all.csv")
@@ -15,9 +27,7 @@ df_area <- read.csv("data/cavicam/2024_cavicam_all.csv")
 
 # prepare cavitated area --------------------------------------------------
 
-folder <- "Q:/cavicam/"
-
-files <- list.files("Q:/cavicam/camp3/", pattern = "all_vessels_qnd.csv", full.names = T)
+files <- list.files("data//cavicam/camp1/", pattern = "\\.csv", full.names = T)
 
 df_area <- files %>%
   map_df(read_csv, .id = "sample_ID") 
@@ -28,39 +38,43 @@ df_area <- files %>%
   rename(id = "...1" ) 
 
 
-df_area <- df_area |> 
-  group_by(sample_ID) |> 
-  mutate(area_cav = cumsum(Area),
-         perc_area_cav =  area_cav / sum(Area),
-         sample_ID = sample_ID |> str_remove_all("\\.csv"),
-         minutes = id * 5 - 5) ## 1 picture every 5 minutes 
+df_area <- df_area |>
+  group_by(sample_ID) |>
+  mutate(
+    area_cav = cumsum(Area),
+    perc_area_cav =  area_cav / sum(Area),
+    vessel_order = sample_ID |> str_extract("all|major"),
+    sample_ID = sample_ID |> str_extract("frex\\_\\d{2}|fasy\\_\\d{2}") |> toupper(),
+    minutes = id * 5 - 5
+  ) ## 1 picture every 5 minutes
 
-df_camp3 <- df_area 
+# df_camp3 <- df_area |> 
+#   mutate(campaign = "3",
+#          year = 2024,
+#          date = "2024-08-13")
 
-df_camp3 <- df_camp3 |> 
-  mutate(vessel_order = "all",
-         sample_ID = sample_ID |> str_remove_all("_all_vessels_qnd") |> toupper(),
-         campaign = "3",
+# df_camp2 <- df_area |> 
+#   mutate(campaign = "2",
+#          year = 2024,
+#          date = "2024-07-10")
+
+df_camp1 <- df_area |> 
+  mutate(campaign = "1",
          year = 2024,
-         date = "2024-08-13")
+         date = "2024-05-19") 
+
+df_area_all <- rbind(df_camp1,
+                     df_camp2,
+                     df_camp3)[, c(1, 2, 12:19)]
 
 df_area |> 
   ggplot() +
-  geom_line(aes(x = minutes, y = perc_area_cav, group = sample_ID, color = sample_ID)) +
-  theme_bw()
+  geom_path(aes(x = minutes, y = perc_area_cav, group = sample_ID, color = sample_ID)) +
+  theme_bw() +
+  facet_wrap(~ vessel_order)
 
 
-
-  
-
-df_area <- read.csv("data/cavicam/2024_cavicam_all.csv")
-
-df_area <- df_area |> 
-  mutate(vessel_order = "all")
-
-df_area <- rbind.data.frame(df_area, df_camp3)
-
-write.csv(df_area, "data/cavicam/2024_cavicam_all.csv", row.names = F)
+write.csv(df_area_all, "data/cavicam/2024_cavicam_all.csv", row.names = F)
 
 # prepare water potential ----------------------------------------------
 
@@ -397,7 +411,6 @@ df_area |> filter(psi_pred_MPa > -10) |>
   ylab("Relative conductivity") +
   xlab("Water potential (MPa)") +
   theme_minimal() 
-  
 
 # preprocess images for faster loading into imagej ------------------------
 library(magick)
@@ -457,14 +470,6 @@ fasy01 <- fasy01 |>
          X = 1:nrow(fasy01))
 write.csv(fasy01, "cavicam/camp1/FREX_07.csv", row.names = F)
 
-write.excel <- function(x,
-                        row.names = FALSE,
-                        col.names = FALSE,
-                        ...) {
-  write.table(
-    x,
-    "clipboard-2048",
-    sep = "\t",
-    row.names = row.names,
-    col.names = col.names,
-    .
+
+  
+
