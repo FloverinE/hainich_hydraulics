@@ -3,6 +3,7 @@
 
 pacman::p_load(tidyverse, janitor)
 
+
 sugar_nutrient <- readxl::read_excel("data/sugars/sugars_nutrients_2023.xlsx") %>% 
   clean_names() %>% 
   mutate(species = recode(species, "Fagus_sylvatica" = "beech", 

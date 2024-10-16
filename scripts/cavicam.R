@@ -525,7 +525,7 @@ nls_p50_frex_major_vessels <- nls(relK ~ f.weibull_plc(-psi_pred_MPa, SX, PX, X 
 )
 
 nls_p50_frex_major_vessels |> coef()
-
+ 
 nlme_p50_frex_major_vessels <- nlme(
   relK ~ f.weibull_plc(-psi_pred_MPa, SX, PX, X = 50),
   data = df_p50_frex_major_vessels,

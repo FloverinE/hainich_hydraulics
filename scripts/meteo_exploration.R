@@ -45,9 +45,9 @@ ggplot(fluxes_2023) +
 ggplot(fluxes_2023) +
   geom_line(aes(x = Timestamp, y = GPP_f), color = "red") +
   geom_area(aes(x = Timestamp, y = GPP_f), fill = "red", alpha = 0.3) +
-  labs(title = "Net Ecosystem Exchange (NEE) 2023",
+  labs(title = "Gross Primary Product (GPP) 2023",
        x = "Date",
-       y = "NEE (umol/m2/s)") +
+       y = "GPP (umol/m2/s)") +
   theme_minimal() +
   theme(plot.title = element_text(hjust = 0.5))
 
@@ -100,7 +100,6 @@ gmin_2023 <- data.frame(species = rep(c("FASY", "FREX"), each = 4),
 campaign_dates_2023 <- c("2023-06-13", "2023-07-17", "2023-08-09", "2023-09-18") |> as.POSIXct()
 
 ## take the sum of the precipitation 1month prior to each campaign
-
 
 
 df_water_balance_2023 <- data.frame(
