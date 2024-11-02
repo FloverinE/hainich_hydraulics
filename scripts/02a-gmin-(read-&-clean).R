@@ -27,11 +27,11 @@ atm_p <- 101.4     # constant atm_p
 # 2.1 Load leaf area data -------------------------------------------------
 
 # list files. General path for all files
-gmin_files_path <- here::here("data/gmin/")
+gmin_files_path <- here::here("data/gmin/2023")
 
 # list all the pv curve measured files
 gmin_leaf_area_files <- list.files(gmin_files_path, recursive = T,
-                                   full.names = T, pattern = "area")
+                                   full.names = T, pattern = "Area")
 
 # list all the sheets with the pv data
 # read the data here 
