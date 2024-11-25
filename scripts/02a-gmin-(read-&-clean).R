@@ -99,7 +99,6 @@ gmin_dry_weight <-  tibble(files = gmin_dryweight_files) %>%
   select(sample_id, species, tree_id, campaign, weight_without_container, date, treatment) %>% 
   rename(dry_weight = weight_without_container)
 
-
 unique(gmin_dry_weight$sample_id)
 
 # 2.3 read data from curves ---------------------------------------------------------------

@@ -51,8 +51,8 @@ pv_data <- pv_data_clean %>%
 pv_data %>%
   filter(species == "SPRUCE" ) %>% 
   # exclude Leinfelde
-  #filter(!site == "H") %>% 
- # inside filter to filter after campaign: & campaign == '3rd' 
+  # filter(!site == "H") %>% 
+  # inside filter to filter after campaign: & campaign == '3rd' 
   ggplot(aes(y = psi_inv, x = mass_cum, group = interaction(ID))) +
   geom_point(col = "#58508d", shape = 21,
              alpha = .6, pch = 20) +
@@ -67,7 +67,7 @@ pv_window <- read_xlsx("outputs/pv_window_update.xlsx") %>%
 # we will use the equation from linear model to extrapolate the slope and intercept of the SWC
 pv_parameters_calculate1 <- pv_data %>% 
   left_join(pv_window) %>% 
- # filter(ID == "1st_FASY_01") %>% 
+  # filter(ID == "1st_FASY_01") %>% 
   group_by(ID) %>% 
   mutate(SI = 1:n(),
          SI_max = n(),

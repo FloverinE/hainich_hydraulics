@@ -1,9 +1,9 @@
-
 # Setup -------------------------------------------------------------------
 {
   library(tidyverse)
   # library(openxlsx)
   library(scam)
+  library(janitor)
   
   write.excel <- function(x,
                           row.names = FALSE,
@@ -46,25 +46,46 @@
 
 # 0. data preparation --------------------------------------------------------
 
+
+## 0.0 prepare cavicam starting times --------------------------------------
+
+df_start_times <- readxl::read_excel("data/cavicam/cavicam_start_times.xlsx")
+
+df_start_times <- df_start_times |> 
+  mutate(start_time = as.POSIXct(time, format = "%Y%m%d-%H%M%S"),
+         year = as.character(year),
+         campaign = as.character(campaign),
+         sample_id = as.character(sample_id))
+
 ## 0.1 prepare cavitated area --------------------------------------------------
 
-files <- list.files("data/cavicam/2024/camp4/", pattern = "\\.csv", full.names = T)
+files <- list.files("data/cavicam/image_areas", pattern = "\\.csv", full.names = T, recursive = T) 
 
 df_area <- files %>%
-  set_names(nm = basename(.)) %>%
-  map_df(read_csv, .id = "sample_ID") |> 
-  rename(id = "...1" ) 
+  set_names(nm = paste0(dirname(.), "/", basename(.))) |> 
+  map_df(data.table::fread, .id = "all_id") |> 
+  clean_names() |> 
+  rename("image_nr" = "v1")
 
 df_area <- df_area |>
-  select(c(sample_ID, id, Area)) |> ## get rid of unnecessary columns
-  group_by(sample_ID) |>
+  dplyr::select(c(all_id, image_nr, area)) |> ## get rid of unnecessary columns
+  group_by(all_id) |>
   mutate(
-    area_cav = cumsum(Area),
-    perc_area_cav =  area_cav / sum(Area),
-    vessel_order = sample_ID |> str_extract("all|major"),
-    sample_ID = sample_ID |> str_extract("frex\\_\\d{2}|fasy\\_\\d{2}") |> toupper(),
-    minutes = id * 5 - 5
-  ) ## 1 picture every 5 minutes
+    area_cav = cumsum(area),
+    perc_area_cav =  area_cav / sum(area),
+    year = all_id |> str_extract("\\d{4}"),
+    campaign = all_id |> str_extract("camp\\d{1}") |> str_remove("camp"),
+    vessel_order = all_id |> str_extract("all|major"),
+    sample_id = all_id |> str_extract("frex\\_\\d{2}|fasy\\_\\d{2}") |> toupper()
+  ) 
+
+df_area <- df_area |> 
+  left_join(df_start_times, by = c("year", "campaign", "sample_id")) 
+
+df_area <- df_area|> 
+  mutate(time = start_time + lubridate::minutes(5 * image_nr),
+         elapsed_time_min = as.numeric(difftime(time, start_time, units = "mins")))
+
 
 
 ## 2023
@@ -181,7 +202,7 @@ df_water_potential <- df_water_potential |>
 write.csv(df_water_potential, "data/cavicam/df_water_potential.csv", row.names = F)
 
 
-# 1. predict psi for cavicams ------------------------------------------------
+# Predict psi for cavicams ------------------------------------------------
 
 ## function
 scamfun <- function(water_potential, area){
@@ -189,11 +210,13 @@ scamfun <- function(water_potential, area){
   predict(mod, newdata = list(minutes = area$minutes))
 }
 
-df_area_nest <- df_area |> mutate(all_id = paste(year, campaign, sample_ID, sep = "_")) |> 
+df_area_nest <- df_area |> 
+  mutate(all_id = paste(year, campaign, sample_ID, sep = "_")) |> 
   nest(data = -c(all_id, vessel_order)) |> 
   rename("area" = "data")
 
-df_water_potential_nest <- df_water_potential |> mutate(all_id = paste(year, campaign, sample_ID, sep = "_")) |> 
+df_water_potential_nest <- df_water_potential |> 
+  mutate(all_id = paste(year, campaign, sample_ID, sep = "_")) |> 
   nest(data = -c(all_id, campaign)) |> 
   rename("water_potential" = "data")
 
@@ -204,7 +227,7 @@ df_all <- df_all |>
          area = map2(area, psi_pred, ~mutate(.x, psi_pred = .y)))
 
 df_area <- df_all |> 
-  select(c(all_id, area, vessel_order)) |> 
+  dplyr::select(c(all_id, area, vessel_order)) |> 
   unnest() |> 
   mutate(psi_pred_MPa = -psi_pred / 10,
          campaign = str_extract(all_id, "(?<=\\_)\\d"))
@@ -253,99 +276,6 @@ cavi_psi_pred_major_vessels.png <- df_area |>
 cavi_psi_pred_major_vessels.png
 ggsave("plots/cavi_psi_pred_major_vessels.png", width = 8, height = 6)
 
-# fit plc -----------------------------------------------------------------
-
-library(fitplc)
-
-
-# We use the built-in example dataset 'stemvul' in the examples below. See ?stemvul.
-# Most examples will fit the Weibull model (the default); try running some of the examples
-# with 'model="sigmoidal"' and compare the results.
-
-# 1. Fit one species (or fit all, see next example)
-dfr1 <- subset(stemvul, Species =="dpap")
-
-# Fit Weibull model. Store results in object 'pfit'
-# 'varnames' specifies the names of the 'PLC' variable in the dataframe,
-# and water potential (WP). 
-# In this example, we use only 50 bootstrap replicates but recommend you set this
-# to 1000 or so.
-pfit <- fitplc(dfr1, varnames=c(PLC="PLC", WP="MPa"), nboot=50)
-
-# Look at fit
-pfit
-#> Class of object 'plcfit' as returned by 'fitplc'.
-#> 
-#> Parameters and %s%% confidence interval:
-#> 
-#>  95%    Estimate Norm - 2.5% Norm - 97.5% Boot - 2.5% Boot - 97.5%
-#> SX 27.639042   19.016029    38.636204   16.745048    35.622913
-#> PX  2.631328    2.310614     2.955739    2.391684     2.975172
-#> 
-
-# Make a standard plot. The default plot is 'relative conductivity',
-# (which is 1.0 where PLC = 0). For plotting options, see ?plot.plcfit
-plot(pfit)
-
-df_test <- df_area |> filter(sample_ID == "FASY_01", 
-                             # campaign == "3",
-                             psi_pred_MPa > -6) |> 
-  mutate(perc_area_cav = perc_area_cav * 100)
-
-pfit_cc <- fitplcs(df_area |> 
-                     mutate(species = substr(sample_ID, 1, 4)), 
-                   varnames=c(PLC="perc_area_cav", WP="psi_pred_MPa"),
-                   group = "species",
-                   random = "campaign",
-                   nboot=100, 
-                   model="sigmoid")
-pfit_cc |> plot()
-
-pfit_cc |> summary()
-
-# fit all species ---------------------------------------------------------
-
-df_camp1 <- df_area |> 
-  filter(campaign == "1")|>
-  mutate(perc_area_cav = perc_area_cav * 100,
-         species = sample_ID |> str_extract("FASY|FREX"))
-
-## model separated by sample
-mod_fix_p50_camp1 <- fitplcs(df_camp1, "sample_ID", varnames=c(PLC="perc_area_cav", WP="psi_pred_MPa"), nboot = 1000, model="sigmoid")
-mod_fix_p50_camp1 |> coef() |> filter(Parameter == "PX") |> write.excel()
-
-mod_fix_p12_camp1 <- fitplcs(df_camp1, "sample_ID", varnames=c(PLC="perc_area_cav", WP="psi_pred_MPa"), nboot = 1000, model="sigmoid", x = 12)
-mod_fix_p12_camp1 |> coef() |> filter(Parameter == "PX") |> write.excel()
-
-mod_fix_p88_camp1 <- fitplcs(df_camp1, "sample_ID", varnames=c(PLC="perc_area_cav", WP="psi_pred_MPa"), nboot = 1000, model="sigmoid", x = 88)
-mod_fix_p88_camp1 |> coef() |> filter(Parameter == "PX") |> write.excel()
-
-df_camp2 <- df_area |> 
-  filter(campaign == "2")|>
-  mutate(perc_area_cav = perc_area_cav * 100,
-         species = sample_ID |> str_extract("FASY|FREX"))
-
-## model separated by sample
-mod_fix_p50_camp2 <- fitplcs(df_camp2, "sample_ID", varnames=c(PLC="perc_area_cav", WP="psi_pred_MPa"), nboot = 1000, model="sigmoid")
-mod_fix_p50_camp2 |> coef() |> filter(Parameter == "PX") |> select(c(Estimate, `Boot - 2.5%`, `Boot - 97.5%`)) |> write.excel()
-
-mod_fix_p12_camp2 <- fitplcs(df_camp2, "sample_ID", varnames=c(PLC="perc_area_cav", WP="psi_pred_MPa"), nboot = 1000, model="sigmoid", x = 12)
-mod_fix_p12_camp2 |> coef() |> filter(Parameter == "PX") |> select(c(Estimate, `Boot - 2.5%`, `Boot - 97.5%`)) |> write.excel()
-
-mod_fix_p88_camp2 <- fitplcs(df_camp2, "sample_ID", varnames=c(PLC="perc_area_cav", WP="psi_pred_MPa"), nboot = 1000, model="sigmoid", x = 88)
-mod_fix_p88_camp2 |> coef() |> filter(Parameter == "PX") |> select(c(Estimate, `Boot - 2.5%`, `Boot - 97.5%`)) |> write.excel()
-
-
-
-
-## model separated by sample, species as random effect
-all_fit_species <- fitplcs(df_camp1, "sample_ID", varnames=c(PLC="perc_area_cav", WP="psi_pred_MPa"), nboot=50, model="sigmoid", random = "species")
-plot(all_fit_species, onepanel=TRUE, plotci=FALSE, px_ci="none", pxlinecol="dimgrey")
-all_fit_species$FASY_01$fit 
-
-
-
-
 # nlme for plc fit --------------------------------------------------------
 
 library(nlme)
@@ -371,55 +301,18 @@ relK_to_plc <- function(relK) 100 - 100*relK
 # Relative conductance/conductivity to PLC.
 # relk_to_plc <- function(relk)100 - 100*relk
 
-#### all vessels,  species wise nlme -------------------------------------------
-
-nlme_p50_species_all_vessels <- nlme(
-  relK ~ f.weibull_plc(-psi_pred_MPa, SX, PX, X = 50),
-  df_area |> filter(psi_pred_MPa > -10,
-                    vessel_order == "all") |>
-    mutate(
-      perc_area_cav = perc_area_cav * 100,
-      relK = plc_to_relk(perc_area_cav),
-      species = substr(sample_ID, 1, 4)
-    ),
-  fixed = list(SX ~ 1, PX ~ 1),
-  random = SX + PX ~ 1 | species / campaign,
-  start = list(fixed = c(SX = 124, PX = 4)),
-  control = nlmeControl(maxiter = 1000, msMaxIter = 2000)
-)
-
-df_area |> filter(psi_pred_MPa > -10,
-                  vessel_order == "all") |>
-  mutate(perc_area_cav = perc_area_cav * 100,
-         relK = plc_to_relk(perc_area_cav), 
-         species = substr(sample_ID, 1, 4)) |>
-  modelr::add_predictions(nlme_p50_species_all_vessels, var = "pred_nlme") |>
-  ggplot() +
-  geom_point(aes(
-    x = psi_pred_MPa,
-    y = relK_to_plc(relK),
-    # col = sample_ID,
-    # group = sample_ID,
-  ), col = "grey", size = 0.5) +
-  geom_line(aes(
-    x = psi_pred_MPa, y = relK_to_plc(pred_nlme),
-    col = campaign, group = campaign
-  ), linewidth = 1) +
-  facet_wrap( ~ species) +
-  ylab("Relative conductivity") +
-  xlab("Water potential (MPa)") +
-  theme_minimal() 
-
-## nested nlme -------------------------------------------
+# nested nlme per species -------------------------------------------
 
 df_mod_nest <- df_area |>
   mutate(
     perc_area_cav = perc_area_cav * 100,
     relK = plc_to_relk(perc_area_cav),
-    species = substr(sample_ID, 1, 4)
+    species = substr(sample_ID, 1, 4),
+    psi_pred_MPa = case_when(psi_pred_MPa > 0 ~ 0,
+                             psi_pred_MPa <= 0 ~ psi_pred_MPa)
   ) |>  
   filter(psi_pred_MPa > -8) |>
-  nest(-c(year, species, vessel_order))
+  nest(data = -c(year, species, vessel_order))
 
 df_mod_nest <- df_mod_nest |> 
   mutate(nls_p50 = map(data, ~ try(nls(relK ~ f.weibull_plc(-psi_pred_MPa, SX, PX, X = 50),
@@ -436,305 +329,272 @@ df_mod_nest <- df_mod_nest |>
            control = nlmeControl(maxiter = 1000, msMaxIter = 2000)
          ), silent = TRUE)))
 
+## extract random effects to display as +- sd() around P50
+ranef(df_mod_nest$nlme_p50[[6]])
+VarCorr(df_mod_nest$nlme_p50[[6]])
+df_mod_nest$nlme_p50[[6]] |> coef() |> pull("PX")
+
+
 df_mod_nest <- df_mod_nest |> 
-  mutate(p50 = map(nlme_p50, ~ coef(.x)$PX))
-
-df_mod_nest$p50[[8]] |> as.data.frame() |> t()
-df_mod_nest$nlme_p50[[6]]
-
-
+  mutate(p50 = purrr::map(nlme_p50, ~ coef(.x)$PX),
+         ranef_sd_p50 = map(nlme_p50, ~ ranef(.x) |> pull(PX) |> unlist() |> sd())|> unlist() |> as.numeric())
 
 df_p50 <- df_mod_nest |> 
   mutate(p50 = map(nlme_p50, ~ coef(.x)$PX)) |> 
-  select(-c(data, nls_p50, nlme_p50)) |> 
-  unnest(cols = p50)
-
-df_p50$campaign <- c(1:4, 1:4, 3:4, 3:4, 1:4, 1:4, 1:4, 1:4)
+  dplyr::select(-c(data, nls_p50, nlme_p50)) |> 
+  unnest(cols = p50) |> 
+  mutate(campaign = c(1:4, 1:4, 3:4, 3:4, 1:4, 1:4, 1:4, 1:4))
 
 df_p50 |> write.csv("data/cavicam/df_p50.csv", row.names = F)
 df_p50 |> write.excel()
 
-#### FREX all vessels nlme -------------------------------------------
+df_p50_summ <- df_mod_nest |> 
+  mutate(p50 = map(nlme_p50, ~ - coef(.x)$PX)) |> 
+  dplyr::select(-c(data, nls_p50, nlme_p50)) |> 
+  unnest(cols = c(p50, ranef_sd_p50)) |> 
+  mutate(campaign = c(1:4, 1:4, 3:4, 3:4, 1:4, 1:4, 1:4, 1:4)) |> 
+  mutate(date = case_when(campaign == "1" & year == "2023" ~ "2023-06-13",
+                          campaign == "1" & year == "2024" ~ "2024-05-28",
+                          campaign == "2" & year == "2023" ~ "2023-07-19",
+                          campaign == "2" & year == "2024" ~ "2024-07-09",
+                          campaign == "3" & year == "2023" ~ "2023-08-11",
+                          campaign == "3" & year == "2024" ~ "2024-08-13",
+                          campaign == "4" & year == "2023" ~ "2023-09-18",
+                          campaign == "4" & year == "2024" ~ "2024-09-23"))
 
-df_p50_frex_all_vessels <- df_area |>
-  mutate(
-    perc_area_cav = perc_area_cav * 100,
-    relK = plc_to_relk(perc_area_cav),
-    species = substr(sample_ID, 1, 4)
-  ) |>
-  filter(psi_pred_MPa > -10,
-         vessel_order == "all",
-         species == "FREX",
-         year == "2024")
+df_p50_summ$date = df_p50_summ$date |> str_replace_all("2023|2024", "2000") |> 
+  as.Date("%Y-%m-%d")
 
-nls_p50_frex_all_vessels <- nls(relK ~ f.weibull_plc(-psi_pred_MPa, SX, PX, X = 50),
-                                data = df_p50_frex_all_vessels,
-                                start = c(SX = 100, PX = 5),
-                                control = nlmeControl(maxiter = 1000, msMaxIter = 2000)
-)
+## plot --------------------------------------------------------------------
 
-nls_p50_frex_all_vessels |> coef()
-
-nlme_p50_frex_all_vessels <- nlme(
-  relK ~ f.weibull_plc(-psi_pred_MPa, SX, PX, X = 50),
-  data = df_p50_frex_all_vessels,
-  fixed = list(SX ~ 1, PX ~ 1),
-  random = SX + PX ~ 1 | campaign,
-  # start = coef(nls_p50_frex_all_vessels),
-  start = c(SX = 100, PX = 5),
-  control = nlmeControl(maxiter = 1000, msMaxIter = 2000)
-)
-
-frex_all_vessels_p50_nlme.png <- df_p50_frex_all_vessels |>
-  modelr::add_predictions(nlme_p50_frex_all_vessels, var = "pred_nlme") |>
+df_p50_summ |> 
   ggplot() +
-  geom_point(aes(
-    x = psi_pred_MPa,
-    y = relK |> relK_to_plc(),
-  ), col = "grey", size = 0.5) +
-  geom_line(aes(
-    x = psi_pred_MPa, y = pred_nlme |> relK_to_plc(),
-    col = campaign, group = campaign
-  ), linewidth = 1) +
-  geom_vline(xintercept = -coef(nlme_p50_frex_all_vessels)$PX, col = scales::hue_pal()(4), linetype = "dashed", linewidth = 1) +
-  ylab("Percent area cavitated") +
-  xlab("Water potential (MPa)") +
-  plot_theme
-frex_all_vessels_p50_nlme.png
-ggsave(frex_all_vessels_p50_nlme.png, filename = "plots/frex_all_vessels_p50_nlme.png", width = 8, height = 8)
+  geom_point(aes(x = date, y = p50, 
+                 group = interaction(year, species), color = as.factor(year)), 
+             position = position_dodge(width = 0.2), size = 2) +
+  geom_errorbar(aes(x = date, ymin = p50 - ranef_sd_p50, ymax = p50 + ranef_sd_p50, color = as.factor(year)), 
+                position = position_dodge(width = 0.2), linewidth = 1, width = 0) +
+  scale_color_discrete("Year") +
+  facet_wrap(species ~ vessel_order) +
+  ylab("P50 [MPa]") +
+  xlab("Date") +
+  ggtitle("mean P50 per species and vessel order per campaign",
+          subtitle = "mean and standard deviation of random effects on campaign") +
+  plot_theme +
+  theme(aspect.ratio = 0.5)
 
-#### FREX major vessels nlme -------------------------------------------
+# nested nlme per sample/campaign -----------------------------------------
 
-df_p50_frex_major_vessels <- df_area |>
+df_sample_nest <- df_area |> 
   mutate(
     perc_area_cav = perc_area_cav * 100,
     relK = plc_to_relk(perc_area_cav),
     species = substr(sample_ID, 1, 4),
-    sample_ID = sample_ID |> as.factor(),
-    campaign = campaign |> as.factor()
-  ) |>
-  filter(psi_pred_MPa > -10,
-         vessel_order == "major",
-         species == "FREX",
-         year == "2024")
+    psi_pred_MPa = case_when(psi_pred_MPa > 0 ~ 0,
+                             psi_pred_MPa <= 0 ~ psi_pred_MPa)
+  ) |>  
+  filter(psi_pred_MPa > -8) |>
+  nest(data = -c(year, species, sample_ID, campaign, vessel_order))
 
-nls_p50_frex_major_vessels <- nls(relK ~ f.weibull_plc(-psi_pred_MPa, SX, PX, X = 50),
-                                  data = df_p50_frex_major_vessels,
-                                  start = c(SX = 100, PX = 5),
-                                  control = nlmeControl(maxiter = 1000, msMaxIter = 2000)
-)
+library(fitplc)
 
-nls_p50_frex_major_vessels |> coef()
- 
-nlme_p50_frex_major_vessels <- nlme(
-  relK ~ f.weibull_plc(-psi_pred_MPa, SX, PX, X = 50),
-  data = df_p50_frex_major_vessels,
-  fixed = list(SX ~ 1, PX ~ 1),
-  random = SX + PX ~ 1 | campaign,
-  # start = coef(nls_p50_frex_major_vessels),
-  start = c(SX = 100, PX = 5),
-  control = nlmeControl(maxiter = 1000, msMaxIter = 2000)
-)
+## individual models per sample_id per campaign
 
-frex_major_vessels_p50_nlme.png <- df_p50_frex_major_vessels |>
-  modelr::add_predictions(nlme_p50_frex_major_vessels, var = "pred_nlme") |>
+df_sample_nest <- df_sample_nest |>
+  mutate(mod_p50 = map(data,
+                       ~ fitplc(
+                         dfr = .x,
+                         varnames = c(PLC = "perc_area_cav", WP = "psi_pred_MPa"),
+                         x = 50
+                         model = "sigmoid",
+                         nboot = 100,
+                         start = c(SX = 40, PX = 5),
+                         control = nls.control(maxiter = 1000)
+                       )
+  ))
+
+## P12
+df_sample_nest <- df_sample_nest |>
+  mutate(mod_p12 = map(data,
+                       ~ fitplc(
+                         dfr = .x,
+                         varnames = c(PLC = "perc_area_cav", WP = "psi_pred_MPa"),
+                         x = 12,
+                         model = "sigmoid",
+                         nboot = 100,
+                         start = c(SX = 40, PX = 5),
+                         control = nls.control(maxiter = 1000)
+                       )
+  ))
+
+## P50
+df_sample_nest <- df_sample_nest |>
+  mutate(mod_p88 = map(data,
+                       ~ fitplc(
+                         dfr = .x,
+                         varnames = c(PLC = "perc_area_cav", WP = "psi_pred_MPa"),
+                         x = 88,
+                         model = "sigmoid",
+                         nboot = 100,
+                         start = c(SX = 40, PX = 5),
+                         control = nls.control(maxiter = 1000)
+                       )
+  ))
+
+## extract coefficients and confidence intervals
+
+df_sample_nest <- df_sample_nest |>
+  mutate(p50 = map(mod_p50, ~ coef(.x)[2, 1]),
+         p50_lwr = map(mod_p50, ~ coef(.x)[2, 2]),
+         p50_upr = map(mod_p50, ~ coef(.x)[2, 3]),
+         p12 = map(mod_p12, ~ coef(.x)[2, 1]),       
+         p12_lwr = map(mod_p12, ~ coef(.x)[2, 2]),
+         p12_upr = map(mod_p12, ~ coef(.x)[2, 3]),
+         p88 = map(mod_p88, ~ coef(.x)[2, 1]),
+         p88_lwr = map(mod_p88, ~ coef(.x)[2, 2]),
+         p88_upr = map(mod_p88, ~ coef(.x)[2, 3])
+  )
+
+coef(df_sample_nest$mod_p50[[1]])
+
+## unnest
+
+df_ov_params <- df_sample_nest |> 
+  select(-c(mod_p50, mod_p12, mod_p88, data)) |>
+  unnest(cols = c(p50, p50_lwr, p50_upr, p12, p12_lwr, p12_upr, p88, p88_lwr, p88_upr)) 
+
+# names(df_ov_params) <- tolower(names(df_ov_params))
+write.csv(df_ov_params, "data/cavicam/df_ov_params.csv", row.names = F)
+
+# models ------------------------------------------------------------------
+
+library(emmeans)
+library(lme4)
+
+## summarise --------------------------------------------------------------------
+
+df_ov_params <- read.csv("data/cavicam/df_ov_params.csv") 
+
+df_ov_params <- df_ov_params |> 
+  mutate(date = case_when(campaign == "1" & year == "2023" ~ "2023-06-13",
+                          campaign == "1" & year == "2024" ~ "2024-05-28",
+                          campaign == "2" & year == "2023" ~ "2023-07-17",
+                          campaign == "2" & year == "2024" ~ "2024-07-09",
+                          campaign == "3" & year == "2023" ~ "2023-08-09",
+                          campaign == "3" & year == "2024" ~ "2024-08-13",
+                          campaign == "4" & year == "2023" ~ "2023-09-18",
+                          campaign == "4" & year == "2024" ~ "2024-09-23"),
+         date_plot = date |> str_replace_all("2023|2024", "2000") |> as.Date("%Y-%m-%d"))
+
+df_ov_params_summ <- df_ov_params |> 
+  group_by(year, species, vessel_order, date) |>
+  summarise(p50 = mean(p50, na.rm = T),
+            p50_lwr = mean(p50_lwr, na.rm = T),
+            p50_upr = mean(p50_upr, na.rm = T),
+            p12 = mean(p12, na.rm = T),
+            p12_lwr = mean(p12_lwr, na.rm = T),
+            p12_upr = mean(p12_upr, na.rm = T),
+            p88 = mean(p88, na.rm = T),
+            p88_lwr = mean(p88_lwr, na.rm = T),
+            p88_upr = mean(p88_upr, na.rm = T)) |> 
+  mutate(date_plot = date |> str_replace_all("2023|2024", "2000") |> as.Date("%Y-%m-%d")) |> 
+  ungroup()
+
+
+df_ov_params_summ <- cbind.data.frame(
+  df_ov_params_summ |> 
+  pivot_longer(cols = c(p50, p12, p88), names_to = "param", values_to = "mean"),
+df_ov_params_summ |> 
+  pivot_longer(cols = c(p50_lwr, p12_lwr, p88_lwr), names_to = "ci_low", values_to = "lower") |> 
+  select(c(lower, ci_low)),
+df_ov_params_summ |> 
+  pivot_longer(cols = c(p50_upr, p12_upr, p88_upr), names_to = "ci_upp", values_to = "upper") |> 
+  select(c(upper, ci_upp))
+) 
+
+write.csv(df_ov_params_summ, "data/cavicam/df_ov_params_summ.csv", row.names = F)
+
+plot_vc_params <- df_ov_params_summ |> 
+  filter(vessel_order == "major") |>
+  mutate(date_plot = date_plot |> as.Date("%Y-%m-%d"),
+        species = recode(species, "FASY" = "beech", "FREX" = "ash"),
+         param_labels = case_when(param == "p12" ~ "P12",
+                                    param == "p50" ~ "P50",
+                                    param == "p88" ~ "P88") |> as.factor(),
+         year = year(date) |> as.factor()
+         ) |> 
+  ggplot(aes(x = date_plot, y = -mean, color = species)) +
+  geom_point() +
+  geom_line(aes(group = interaction(species, year), lty = year)) +
+  geom_errorbar(aes(ymin = -lower, ymax = -upper), width = 0) +
+  labs(x = "Date", y = "Leaf water potential [MPa]", 
+       title = "Leaf water potentials at 12%, 50%, 88% embolism",
+       subtitle = "errorbars represent bootstrap confidence intervals") +
+  guides(color = guide_legend(title = "Species", ncol = 1),
+         lty = guide_legend(title = "Year", ncol = 1))+
+  facet_wrap(~ param_labels)  +
+  scale_color_viridis_d(option = "inferno", begin = 0.2, end = 0.8) +
+  presentation_theme 
+
+plot_vc_params
+ggsave("figures/plot_vc_params.png", plot_vc_params, width = 10, height = 6, dpi = 300)
+
+
+## lmer --------------------------------------------------------------------
+
+df_ov_params_nest <- df_ov_params |> 
+  filter(vessel_order == "major",
+         # species != "FREX" | campaign != "3" | year != "2023",
+         # species != "FREX" | campaign != "2" | year != "2023",
+         # species != "FREX" | campaign != "1" | year != "2023",
+         # year != "2023"
+         ) |> 
+  mutate(date = as.factor(date), 
+         species = as.factor(species),
+         sample_id = as.factor(sample_id)) |>
+  pivot_longer(cols = c(p50, p12, p88), names_to = "param", values_to = "value") |>
+  nest(data = -param)
+
+df_ov_params_nest <- df_ov_params_nest |> 
+  mutate(mod = map(data, ~ lmer(value ~ species * date + (1 | species/sample_id), data = .x)
+  ))
+
+df_ov_params_nest$mod[[1]]
+
+## emmeans -----------------------------------------------------------------
+
+df_ov_params_nest <- df_ov_params_nest |> 
+  mutate(est_mean = map(mod, ~ emmeans(.x,  ~ species * date, 
+                                         adjust = "mvt",
+                                         type = "response",
+                                       cov.reduce = TRUE,
+                                       na.rm = T) 
+  ))
+
+df_ov_params_nest <- df_ov_params_nest |>
+  mutate(est_mean_df = map(est_mean, ~ as.data.frame(.x)))
+
+df_sample_est_means <- df_ov_params_nest |> 
+  select(-est_mean) |>
+  unnest(cols = c(est_mean_df)) |>
+  mutate(date_plot = date |> str_replace_all("2023|2024", "2000") |> as.Date("%Y-%m-%d"))
+
+
+df_sample_est_means |> 
+  mutate(year = year(date) |> as.factor()) |>
   ggplot() +
-  geom_point(aes(
-    x = psi_pred_MPa,
-    y = relK |> relK_to_plc(),
-  ), col = "grey", size = 0.5) +
-  geom_line(aes(
-    x = psi_pred_MPa, y = pred_nlme |> relK_to_plc(),
-    col = campaign, group = campaign
-  ), linewidth = 1) +
-  geom_vline(xintercept = -coef(nlme_p50_frex_major_vessels)$PX, col = scales::hue_pal()(4), linetype = "dashed", linewidth = 1) +
-  ylab("Percent area cavitated") +
-  xlab("Water potential (MPa)") +
-  plot_theme
-frex_major_vessels_p50_nlme.png
-ggsave(frex_major_vessels_p50_nlme.png, filename = "plots/frex_major_vessels_p50_nlme.png", width = 8, height = 8)
-
-
-#### FASY all vessels nlme -------------------------------------------
-
-df_p50_fasy_all_vessels <- df_area |>
-  mutate(
-    perc_area_cav = perc_area_cav * 100,
-    relK = plc_to_relk(perc_area_cav),
-    species = substr(sample_ID, 1, 4)
-  ) |>
-  filter(psi_pred_MPa > -10,
-         vessel_order == "all",
-         species == "FASY",
-         year == "2024")
-
-nls_p50_fasy_all_vessels <- nls(relK ~ f.weibull_plc(-psi_pred_MPa, SX, PX, X = 50),
-                                data = df_p50_fasy_all_vessels,
-                                start = c(SX = 100, PX = 10),
-                                control = nlmeControl(maxiter = 1000, msMaxIter = 2000)
-)
-
-nls_p50_fasy_all_vessels |> coef()
-
-nlme_p50_fasy_all_vessels <- nlme(
-  relK ~ f.weibull_plc(-psi_pred_MPa, SX, PX, X = 50),
-  data = df_p50_fasy_all_vessels,
-  fixed = list(SX ~ 1, PX ~ 1),
-  random = SX + PX ~ 1 | campaign,
-  # start = coef(nls_p50_fasy_all_vessels),
-  start = c(SX = 100, PX = 5),
-  control = nlmeControl(maxiter = 1000, msMaxIter = 2000)
-)
-
-fasy_all_vessels_p50_nlme.png <- df_p50_fasy_all_vessels |>
-  modelr::add_predictions(nlme_p50_fasy_all_vessels, var = "pred_nlme") |>
-  ggplot() +
-  geom_point(aes(
-    x = psi_pred_MPa,
-    y = relK |> relK_to_plc(),
-  ), col = "grey", size = 0.5) +
-  geom_line(aes(
-    x = psi_pred_MPa, y = pred_nlme |> relK_to_plc(),
-    col = campaign, group = campaign
-  ), linewidth = 1) +
-  geom_vline(xintercept = -coef(nlme_p50_fasy_all_vessels)$PX, col = scales::hue_pal()(4), linetype = "dashed", linewidth = 1) +
-  ylab("Percent area cavitated") +
-  xlab("Water potential (MPa)") +
-  plot_theme
-fasy_all_vessels_p50_nlme.png
-ggsave(fasy_all_vessels_p50_nlme.png, filename = "plots/fasy_all_vessels_p50_nlme.png", width = 8, height = 8)
-
-#### FASY major vessels nlme -------------------------------------------
-
-df_p50_fasy_major_vessels <- df_area |>
-  mutate(
-    perc_area_cav = perc_area_cav * 100,
-    relK = plc_to_relk(perc_area_cav),
-    species = substr(sample_ID, 1, 4)
-  ) |>
-  filter(
-    psi_pred_MPa > -10,
-    vessel_order == "major",
-    species == "FASY",
-    year == "2024")
-
-nls_p50_fasy_major_vessels <- nls(relK ~ f.weibull_plc(-psi_pred_MPa, SX, PX, X = 50),
-                                  data = df_p50_fasy_major_vessels,
-                                  start = c(SX = 100, PX = 10),
-                                  control = nlmeControl(maxiter = 1000, msMaxIter = 2000)
-)
-
-nls_p50_fasy_major_vessels |> coef()
-
-nlme_p50_fasy_major_vessels <- nlme(
-  relK ~ f.weibull_plc(-psi_pred_MPa, SX, PX, X = 50),
-  data = df_p50_fasy_major_vessels,
-  fixed = list(SX ~ 1, PX ~ 1),
-  random = SX + PX ~ 1 | campaign,
-  # start = coef(nls_p50_fasy_major_vessels),
-  start = c(SX = 40, PX = 5),
-  control = nlmeControl(maxiter = 1000, msMaxIter = 2000)
-)
-
-nlme_p50_fasy_major_vessels |> summary()
-
-fasy_major_vessels_p50_nlme.png <- df_p50_fasy_major_vessels |>
-  modelr::add_predictions(nlme_p50_fasy_major_vessels, var = "pred_nlme") |>
-  ggplot() +
-  geom_point(aes(
-    x = psi_pred_MPa,
-    y = relK |> relK_to_plc(),
-  ), col = "grey", size = 0.5) +
-  geom_line(aes(
-    x = psi_pred_MPa, y = pred_nlme |> relK_to_plc(),
-    col = campaign, group = campaign
-  ), linewidth = 1) +
-  geom_vline(xintercept = -coef(nlme_p50_fasy_major_vessels)$PX, col = scales::hue_pal()(4), linetype = "dashed", linewidth = 1) +
-  ylab("Percent area cavitated") +
-  xlab("Water potential (MPa)") +
-  plot_theme
-fasy_major_vessels_p50_nlme.png
-ggsave(fasy_major_vessels_p50_nlme.png, filename = "plots/fasy_major_vessels_p50_nlme.png", width = 8, height = 8)
-
-##### model comparisons -------------------------------------------------------
-
-models <- list(
-  nlme_p50_frex_all_vessels,
-  nlme_p50_frex_major_vessels,
-  nlme_p50_fasy_all_vessels,
-  nlme_p50_fasy_major_vessels
-)
-
-library(broom.mixed)
-
-df_model_coefs <- models |> map(~coef(.)$PX) |> unlist() |>  matrix(nrow = 4, ncol = 3, byrow = T)
-
-df_model_coefs |> write.excel()
-
-# preprocess images for faster loading into imagej ------------------------
-library(magick)
-library(tidyverse)
-
-image_path <- "Q:/cavicam/"
-samples <- list.dirs(image_path, full.names = T, recursive = F)
-frex08 <- samples[1]
-new_folder = paste0(frex08, "_resized")
-dir.create(new_folder, showWarnings = F)
-
-for(i in 1:length(list.files(frex08, pattern = "\\.png"))) {
-  img <- image_read(list.files(frex08, full.names = T)[i])
-  img |>
-    image_resize("1296x972") |>
-    image_write(paste0(new_folder, "/", list.files(frex08)[i]))
-  if (i %% 10 == 0) {
-    print(i)
-  }
-}
-
-
-
-
-
-
-
-# test area ---------------------------------------------------------------
-
-
-
-df_test <- df_all |> 
-  mutate(psi_pred_cavi = map2(water_potential, water_potential, scamfun),
-         cavi = map2(water_potential, psi_pred_cavi, ~mutate(.x, psi_pred_cavi = .y)))
-
-df_test2 <- df_test |> 
-  select(c(sample_ID, cavi)) |> 
-  unnest()
-
-
-img1 <- image_read("Q:/cavicam/Cav15_FREX_05_FW/20240531-214508.png", depth = 8)
-img2 <- image_read("Q:/cavicam/Cav15_FREX_05_FW/20240531-215019.png", depth = 8)
-
-
-img1 <- img1 |> image_convert(colorspace = "gray") 
-img2 <- img2 |> image_convert(colorspace = "gray")
-
-img1data = img1 |> image_data() |> as.data.frame() 
-img1data |> col2rgb() 
-
-
-# dump --------------------------------------------------------------------
-
-fasy011 <- read.csv("cavicam/camp1/frex07_1-800_qnd.csv")
-fasy012 <- read.csv("cavicam/camp1/frex07_800-end_qnd.csv")
-
-fasy01 <- rbind.data.frame(fasy011, fasy012) 
-fasy01 <- fasy01 |> 
-  mutate(sample_ID = "FREX_07",
-         campaign = "1",
-         year = "2024",
-         date = "2024-05-29",
-         X = 1:nrow(fasy01))
-write.csv(fasy01, "cavicam/camp1/FREX_07.csv", row.names = F)
-
-
+  geom_line(aes(x = date_plot, y = -emmean, group = interaction(year, species), lty = year), size = 1, col = "grey") +
+  geom_point(aes(x = date_plot, y = -emmean, col = species, group = interaction(year, species)), size = 3,
+              position = position_dodge(0.75)) +
+  geom_errorbar(aes(x = date_plot, ymin = -lower.CL, ymax = -upper.CL, col = species), 
+                width = 1, linewidth = 1, position = position_dodge(0.75)) +
+  scale_color_discrete(name = "Species") +
+  ylab("") +
+  xlab("Date") +
+  ggtitle("Gmin per species and date",
+          subtitle = "contrasts and 95% CI of Gmin between 70% and 90% residual water content") +
+  facet_wrap(~param) +
+  plot_theme +
+  theme(aspect.ratio = 1)
 
 

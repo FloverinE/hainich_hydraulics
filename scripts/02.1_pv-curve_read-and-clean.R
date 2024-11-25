@@ -13,7 +13,7 @@ conflicts_prefer(dplyr::filter)
 # 2. reading PV data --------------------------------------------
 # get headers
 # path for the file
-pv_files_path <- here::here("data/pv-curve-h/")
+pv_files_path <- here::here("data/PV/2023/")
 
 
 
@@ -56,6 +56,6 @@ pv_data_clean <- pv_data %>%
 
 
 # 5. Export final dataset -----------------------------------------------------
-write_csv(pv_data_clean, "data/pv_data_clean.csv")
+write_csv(pv_data_clean, "data/PV/2023/pv_data_clean.csv")
 
 
