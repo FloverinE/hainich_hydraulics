@@ -27,6 +27,10 @@ plot_alpha = 0.5
 
 # data preparation --------------------------------------------------------
 
+
+# 2023 --------------------------------------------------------------------
+
+
 sugar_nutrient <- readxl::read_excel("data/sugars/sugars_nutrients_2023.xlsx") |>
   clean_names() 
 
@@ -76,4 +80,36 @@ df_nutrients_summ <- nutrients |>
 write.csv(df_nutrients_summ, file = "data/calculated_parameters/df_nutrients_2023.csv", row.names = FALSE)
 
 
-####
+# 2024 --------------------------------------------------------------------
+
+sugar_nutrient_2024 <- readxl::read_excel("data/sugars/sugars_nutrients_2024.xlsx") |>
+  clean_names() 
+
+unique(sugar_nutrient_2024$species)
+
+sugar_nutrient_2024 |>
+  names()
+
+sugars_2024 <- sugar_nutrient_2024 |> 
+  dplyr::select(site, id_field, species, campaign, date, tree, sugar_weight_mg:starch_mg_g) |>
+  mutate(sample_id = str_extract(id_field, "FREX\\_\\d+|FASY\\_\\d+")) |> 
+  pivot_longer(names_to = "sugar_name",
+               values_to = "sugar_conc",
+               cols = c(sugar_weight_mg:starch_mg_g)) |> 
+  ungroup()
+
+df_sugars_2024_summ <- sugars_2024 |>
+  filter(!sugar_name %in% c("dilution", "starch_dilution"), !sugar_name |> str_detect("ppm")) |>
+  mutate(species = recode(species, "Fagus_sylvatica" = "FASY",
+                          "Fraxinus_excelsior" = "FREX"),
+         year = "2024",
+         date = as.Date(date, format = "%d.%m.%Y")
+         ) |> 
+  dplyr::select(-c(site, id_field, tree)) |>
+  group_by(campaign, species, sample_id, year, sugar_name, date) |>
+  summarise(sugar_conc = mean(sugar_conc, na.rm = TRUE)) 
+
+write.csv(df_sugars_2024_summ, file = "data/calculated_parameters/df_sugars_2024.csv", row.names = FALSE)
+
+
+
