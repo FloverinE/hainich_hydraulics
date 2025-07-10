@@ -111,5 +111,55 @@ df_sugars_2024_summ <- sugars_2024 |>
 
 write.csv(df_sugars_2024_summ, file = "data/calculated_parameters/df_sugars_2024.csv", row.names = FALSE)
 
+nutrients_2024 <- sugar_nutrient_2024 %>% 
+  dplyr::select(site, id_field, species, campaign, date, tree, canopy_position, c_con_percent:s_con_mg_kg) %>% 
+  pivot_longer(names_to = "nutrient_name",
+               values_to = "nutrient_conc",
+               cols = -c(site:canopy_position)) %>% 
+  na.omit()
+
+df_nutrients_summ <- nutrients_2024 |> 
+  filter(canopy_position == "Top") |>
+  mutate(sample_id = str_extract(id_field, "FREX\\_\\d+|FASY\\_\\d+"),
+         species = recode(species, "Fagus_sylvatica" = "FASY",
+                          "Fraxinus_excelsior" = "FREX"),
+         year = 2023,
+         date = as.Date(date, format = "%d.%m.%y")) |> 
+  group_by(campaign, species, sample_id, year, nutrient_name, date) |>
+  summarise(nutrient_conc = mean(nutrient_conc, na.rm = TRUE)) |>
+  dplyr::select(campaign, species, sample_id, year, nutrient_name, nutrient_conc, date)
+
+write.csv(df_nutrients_summ, file = "data/calculated_parameters/df_nutrients_2024.csv", row.names = FALSE)
+
+# 2025 new data -----------------------------------------------------------
+
+data_2025_sugars <- readxl::read_excel("data/sugars/Hainich_Data_2024_for Sharath.xlsx")
+
+data_2025_nutrients <- readxl::read_excel("data/sugars/Jianbei_Huang_250425_LS_1646.xls", skip = 10)
+data_2025_nutrients <- data_2025_nutrients %>% 
+  select(c(Probenname, Nummer, Parameter, Ergebnis, Fehler)) %>% 
+  rename("id.labo" = "Probenname",
+         "element_name" = "Parameter",
+         "element_conc_mg_kg" = "Ergebnis",
+         "element_conc_error_mg_kg" = "Fehler") %>% 
+  left_join(data_2025_sugars %>% select(id.labo, Species, Campaign, Date, Tree)) %>% 
+  janitor::clean_names() %>% 
+  mutate(date = date %>% as.Date(format = "%d.%m.%Y")) %>% 
+  rename("tree_id" = "tree") %>% 
+  select(-c(id_labo, nummer))
+
+write.csv(data_2025_nutrients, "data/calculated_parameters/df_elements_2025.csv", row.names = F)
+
+
+
+
+
+
+
+
+
+
+
+
 
 
