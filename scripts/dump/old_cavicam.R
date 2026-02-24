@@ -65,17 +65,14 @@ img1data |> col2rgb()
 
 # dump --------------------------------------------------------------------
 
-fasy011 <- read.csv("cavicam/camp1/frex07_1-800_qnd.csv")
-fasy012 <- read.csv("cavicam/camp1/frex07_800-end_qnd.csv")
+fasy011 <- read.csv("Q:/cavicam/2024/camp1/old/frex05_1-800_qnd.csv")
+fasy012 <- read.csv("Q:/cavicam/2024/camp1/old/frex05_800-end_qnd.csv")
 
 fasy01 <- rbind.data.frame(fasy011, fasy012) 
 fasy01 <- fasy01 |> 
-  mutate(sample_ID = "FREX_07",
-         campaign = "1",
-         year = "2024",
-         date = "2024-05-29",
-         X = 1:nrow(fasy01))
-write.csv(fasy01, "cavicam/camp1/FREX_07.csv", row.names = F)
+  mutate(X = 1:nrow(fasy01)) |> 
+  rename(" " = "X")
+write.csv(fasy01, "Q:/cavicam/2024/camp1/frex_05_all_vessels_new.csv", row.names = F)
 
 #### all vessels,  species wise nlme -------------------------------------------
 
