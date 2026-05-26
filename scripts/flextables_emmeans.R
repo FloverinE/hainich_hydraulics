@@ -4,9 +4,14 @@ library(tidyverse)
 library(flextable)
 library(multcompView)
 library(emmeans)
+source("scripts/ggplot_themes.R") ## this also has the flextable theme
 
+# nested dataframes with emmeans grid objects
+df.hydr_traits_emm = read_rds("output/emmeans/emm_hydr_traits.Rds")
+df.sugars_emm = read_rds("output/emmeans/emm_nsc.rds")
 
-df.sugars_emm = read_csv("data/calculated_parameters/df_sugars_emmeans.csv") |>
+## load output files for the  and rename columns
+df.sugars_table = read_csv("data/calculated_parameters/df_sugars_emmeans.csv") |>
   mutate(
     "lower CL" = lower.CL,
     "upper CL" = upper.CL,
@@ -75,20 +80,9 @@ df.nutrients_emm = read_csv(
   )
 
 
-df.traits_emm = read_csv(
+df_hydr_traits_table = read_csv(
   "data/calculated_parameters/df_hydr_traits_emmeans.csv"
-)
-
-df.traits_emm = df.traits_emm |>
-  # read_rds("output/emmeans/emm_hydr_traits.Rds") |>
-  # select(trait, data) |>
-  # unnest(cols = c(data)) |>
-  # left_join(
-  #   df.hydr_traits_nest_mods |>
-  #     select(trait, emm) |>
-  #     unnest(cols = c(emm)),
-  #   by = c("trait", "year", "species", "date_fac")
-  # ) |>
+)  |>
   mutate(
     "lower CL" = case_when(is.na(asymp.LCL) ~ lower.CL, T ~ asymp.LCL),
     "upper CL" = case_when(is.na(asymp.UCL) ~ upper.CL, T ~ asymp.UCL),
@@ -121,73 +115,10 @@ df.traits_emm = df.traits_emm |>
     "Sign. group" = ".group"
   )
 
-source("scripts/ggplot_themes.R")
 
-# trait tables ------------------------------------------------------------
+# Tables for LME coefficients ----------------------------------------------------------
 
-df.hydr_trait_mods = read_rds("output/emmeans/emm_hydr_traits.Rds")
-
-contrast(df.hydr_trait_mods$emm[[1]]) |> multcomp::cld()
-
-regrid(df.hydr_traits_nest_base$emm[[1]]) |> multcomp::cld()
-
-test = pairs(df.hydr_traits_nest_base$emm[[1]]) |> as.data.frame()
-
-## psi_midday --------------------------------------------------------------
-
-ft_midday = df.traits_emm |>
-  filter(trait == "psi_midday_mpa") |>
-  distinct() |>
-  select(-trait)
-
-flextable(ft_midday) |>
-  ft_theme() |>
-  set_caption("Midday leaf water potential (MPa)") |>
-  save_as_docx(path = "tables/psi_midday.docx")
-
-flextable::as_flextable(df.hydr_traits_nest_mods$lme[[2]], add.random = T) |>
-  ft_theme() |>
-  save_as_docx(path = "tables/lme_psi_midday.docx")
-
-df.hydr_traits_nest_mods$lme[[2]] |> View()
-
-df.hydr_traits_nest_mods$lme[[2]] |> summary()
-
-
-## emmeans from fig2 script --------------------------------------
-
-df.traits_emm$trait |> unique()
-
-# Create a numbered list of traits
-trait_list <- df.traits_emm$trait |> unique()
-trait_numbers <- seq(1, length(trait_list))
-
-# Loop through each trait and create the flextable
-for (i in seq_along(trait_list)) {
-  trait_sel <- trait_list[i]
-  caption = trait_sel
-  num <- trait_numbers[i]
-
-  # Create flextable for the current trait
-  ft <- df.traits_emm |>
-    ungroup() |>
-    filter(trait == trait_sel) |>
-    # distinct() |>
-    select(-trait)
-
-  # Set the caption and save the flextable
-  flextable(ft) |>
-    set_caption(caption) |>
-    ft_theme() |>
-    save_as_docx(path = paste0("tables/emmeans/", num, "_", trait_sel, ".docx"))
-  print(i)
-}
-
-
-# lme flextables ----------------------------------------------------------
-
-# Create a numbered list of traits
-trait_list <- df.hydr_traits_nest_mods$trait |> unique()
+trait_list <- df.hydr_traits_emm$trait |> unique()
 trait_numbers <- seq(1, length(trait_list))
 
 for (i in seq_along(trait_list)) {
@@ -195,15 +126,18 @@ for (i in seq_along(trait_list)) {
   caption = trait_sel
   num <- trait_numbers[i]
 
-  flextable::as_flextable(df.hydr_traits_nest_mods$lme[[i]], add.random = T) |>
+  as_flextable(df.hydr_traits_emm$lme[[i]], add.random = T) |>
     set_caption(caption) |>
     ft_theme() |>
     save_as_docx(
-      path = paste0("tables/lme_coefs/", num, "_lme_", trait_sel, ".docx")
+      path = paste0("tables/01_hydr_traits/lme_coefs/", num, "_lme_", trait_sel, ".docx")
     )
 }
 
-## emmeans from fig5 NSC script --------------------------------------
+
+# Tables for emmeans results ----------------------------------------------
+
+## NSC --------------------------------------
 
 df.sugars_emm$sugar_name |> unique()
 
@@ -216,14 +150,14 @@ for (i in seq_along(sugar_list)) {
   sugar_sel <- sugar_list[i]
   caption = sugar_sel
   num <- sugar_numbers[i]
-
+  
   # Create flextable for the current sugar
   ft <- df.sugars_emm |>
     ungroup() |>
     filter(sugar_name == sugar_sel) |>
     # distinct() |>
     select(-sugar_name)
-
+  
   # Set the caption and save the flextable
   flextable(ft) |>
     set_caption(caption) |>
@@ -233,6 +167,134 @@ for (i in seq_along(sugar_list)) {
     )
   print(i)
 }
+
+# Tables for all values of individual sample trees ---------------------------------------------
+
+## psi_midday --------------------------------------------------------------
+
+ft_midday = df_hydr_traits_emm |>
+  filter(trait == "psi_midday_mpa") |>
+  distinct() |>
+  select(-trait)
+
+flextable(ft_midday) |>
+  ft_theme() |>
+  set_caption("Midday leaf water potential (MPa)") |>
+  save_as_docx(path = "tables/psi_midday.docx")
+
+flextable::as_flextable(df.hydr_traits_nest_emm$lme[[2]], add.random = T) |>
+  ft_theme() |>
+  save_as_docx(path = "tables/lme_psi_midday.docx")
+
+df.hydr_traits_emm$lme[[2]] |> View()
+
+df.hydr_traits_emm$lme[[2]] |> summary()
+
+
+
+
+# emmeans ----------------------------------------------------------------
+
+test = df.sugars_emm$emm[[1]] |> as.emmGrid()
+pairs_test = test |> pairs() |> as.data.frame()
+pairs_test ## all combinations in reference to baseline, way too many
+
+df.sugars_nest$emm[[1]] |> contrast()
+df.sugars_nest$emm[[1]] |> pairs()
+df.sugars_nest$emm[[1]] |> regrid()
+
+df.sugars_nest$data[[1]]
+
+# only keep sensible combinations, i.e., species at the same date, within species across dates
+# Assuming df.sugars_nest contains your nested data
+library(emmeans)
+library(dplyr)
+
+# Extract the emmGrid object
+test <- df.sugars_nest$emm[[1]] |> as.emmGrid()
+
+# Create pairwise comparisons for species within each date
+test |>
+  emmeans(pairwise ~ species | date_fac) |>
+  pluck("contrasts") |>
+  as.data.frame()
+
+test |>
+  emmeans(pairwise ~ species | date_fac) |>
+  pluck("emmeans") |>
+  as.data.frame()
+
+# Create pairwise comparisons for dates within each species
+test |>
+  emmeans(pairwise ~ date_fac | species | year) |>
+  pluck("emmeans") |>
+  as.data.frame() |>
+  flextable() |>
+  ft_theme()
+
+
+emm <- emmeans(test, ~ species | date_fac)
+
+# means
+means_df <- as.data.frame(emm)
+
+# contrasts
+contr_df <- contrast(emm, "pairwise") |>
+  as.data.frame()
+
+contr_with_means <- contr_df |>
+  # as.data.frame() |>
+  separate(contrast, into = c("FASY", "FREX"), sep = " - ") |>
+  left_join(means_df, by = c("FASY" = "species", "date_fac", "year")) |>
+  rename(mean1 = emmean) |>
+  left_join(means_df, by = c("FASY" = "species", "date_fac", "year")) |>
+  rename(mean2 = emmean)
+contr_with_means
+
+expSup <- function(x, digits = 3) {
+  sprintf(
+    paste0("%03.", digits, "f x 10^%d^"),
+    x / 10^floor(log10(abs(x))),
+    floor(log10(abs(x)))
+  )
+}
+
+test |>
+  emmeans(pairwise ~ species | date_fac) |>
+  pluck("contrasts") |>
+  as.data.frame() |>
+  rbind(
+    test |>
+      emmeans(pairwise ~ date_fac | species | year) |>
+      pluck("contrasts") |>
+      as.data.frame()
+  ) |>
+  mutate(
+    p.value = expSup(p.value)
+  ) |>
+  # Create pairwise comparisons for dates within each species
+  flextable() |>
+  ft_theme()
+
+# Combine the contrasts
+all_contrasts <- list(
+  species_date_contrasts,
+  date_species_contrasts
+)
+
+# Convert the contrasts to data frames
+species_date_pairs <- species_date_contrasts |> as.data.frame()
+date_species_pairs <- date_species_contrasts |> as.data.frame()
+
+# Display the results
+species_date_pairs
+date_species_pairs
+
+test |>
+  multcomp::cld(Letters = letters)
+
+test |> pairs() |> as.data.frame() |> nrow()
+
 
 ## emmeans from fig6 Nutrient script --------------------------------------
 
@@ -275,15 +337,11 @@ for (i in seq_along(nutrient_list)) {
 
 # tests ------------------------------------------------------------------
 
-test = df.hydr_traits_nest_mods$emm_pairs[[1]]
-pairs_test = test |> pairs() |> as.data.frame()
-test |> multcomp::cld(Letters = letters) |> as.data.frame()
-
-test = df.hydr_traits_nest_mods |>
+test = df.hydr_traits_nest_emm |>
   select(trait, data) |>
   unnest(cols = c(data)) |>
   left_join(
-    df.hydr_traits_nest_mods |>
+    df.hydr_traits_nest_emm |>
       select(trait, emm) |>
       unnest(cols = c(emm)),
     by = c("trait", "year", "species", "date_fac")
