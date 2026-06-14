@@ -186,3 +186,25 @@ for (i in 1:4) {
     )
   print(i)
 }
+
+
+for (i in 1:4) {
+  ft = f.emm2flextable_species(
+    emm = df.hsm_emm$emm[[i]],
+    species_var = "species",
+    date_var = "date_fac",
+    year_var = "year",
+    digits = 3,
+    caption_txt = df.hsm_emm$threshold_caption[i],
+    theme_fun = ft_theme
+  )
+  ft |>
+    save_as_docx(
+      path = paste0(
+        table_paths,
+        df.hsm_emm$threshold[i],
+        "_species_comp.docx"
+      )
+    )
+  print(i)
+}
