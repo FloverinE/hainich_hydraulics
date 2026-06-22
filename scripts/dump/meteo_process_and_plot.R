@@ -840,7 +840,7 @@ df_meteo_fluxes_2023_2024 <- df_meteo_fluxes_2023_2024 |>
 
 # REW relative extractable water ----------------------------------------------
 
-df_swc <- df_meteo_fluxes_2023_2024 |> 
+df_swc <- df_meteo_2023_2024 |> 
   select(c(timestamp, swc_8cm_1, swc_8cm_2, swc_8cm_3, swc_8cm_4, swc_16cm_1, swc_32cm_1)) |>
   group_by(timestamp) |>
   summarise(swc_8cm = mean(c(swc_8cm_1, swc_8cm_2, swc_8cm_3, swc_8cm_4), na.rm = TRUE),
@@ -851,7 +851,7 @@ df_swc |>
   ggplot() +
   geom_line(aes(x = timestamp, y = swc_0_32_avg)) 
 
-df_swc_longterm <- df_meteo_2000_2023 |> 
+df_swc_longterm <- df_meteo_ref |> 
   select(c(day, month, year, swc_f_mds_1, swc_f_mds_2, swc_f_mds_3)) |> 
   filter(swc_f_mds_1 >= 0, swc_f_mds_2 >= 0, swc_f_mds_3 >= 0) |> 
   group_by(year, month, day) |>
@@ -877,14 +877,12 @@ df_swc <- df_swc |>
          rew_per = rew * 100,
          timestamp = as.POSIXct(timestamp))
 
-df_meteo_fluxes_2023_2024 <- df_meteo_fluxes_2023_2024 |> 
+df_meteo_2023_2024 <- df_meteo_2023_2024 |> 
   left_join(df_swc, by = "timestamp")
-
-
 
 # export ------------------------------------------------------------------
 
-write.csv(df_meteo_fluxes_2023_2024, "data/microclimate/meteo_fluxes_2023_2024_30min.csv", row.names = FALSE)
+write.csv(df_meteo_2023_2024, "data/microclimate/df_meteo_2023_2024.csv", row.names = FALSE)
 
 
 # SPEI  -------------------------------------------------------------------

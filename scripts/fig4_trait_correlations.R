@@ -237,10 +237,10 @@ df.corr <- df.hydr_traits_corr |>
     elast_tot_mpa,
     rwc_tlp_tot_perc,
     gmin_mmol_m2_s,
-    p12_mpa,
-    # p50_mpa,
-    t5_degc,
-    # t50_degc
+    # p12_mpa,
+    p50_mpa,
+    # t5_degc,
+    t50_degc
   ) |>
   mutate(
     species = factor(species),
@@ -256,10 +256,10 @@ df.corr <- df.hydr_traits_corr |>
     "ε (MPa)" = elast_tot_mpa,
     "RWC<sub>TLP</sub> (%)" = rwc_tlp_tot_perc,
     "g<sub>min</sub> (mmol m<sup>-2</sup> s<sup>-1</sup>)" = gmin_mmol_m2_s,
-    "P<sub>12</sub> (MPa)" = p12_mpa,
-    # "P<sub>50</sub> (MPa)" = p50_mpa,
-    "T<sub>5</sub> (°C)" = t5_degc,
-    # "T<sub>50</sub> (°C)" = t50_degc
+    # "P<sub>12</sub> (MPa)" = p12_mpa,
+    "P<sub>50</sub> (MPa)" = p50_mpa,
+    # "T<sub>5</sub> (°C)" = t5_degc,
+    "T<sub>50</sub> (°C)" = t50_degc
   )
 
 fig4_trait_corr_mat.png = ggcorrm(
@@ -303,5 +303,3 @@ ggsave(
   height = 20,
   units = "cm"
 )
-
-

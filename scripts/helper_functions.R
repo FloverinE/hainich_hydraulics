@@ -22,6 +22,7 @@ f.emm2flextable <- function(
   caption_txt = NULL,
   theme_fun = ft_theme
 ) {
+
   specs <- as.formula(
     paste0("pairwise ~ ", date_var, " | ", species_var, " * ", year_var)
   )
@@ -37,7 +38,7 @@ f.emm2flextable <- function(
     # all rows are estimable → safe to call regrid()
     emm <- regrid(emm)
   }
-
+  
   pw <- emmeans(emm, specs, type = "response")
 
   contr <- pw$contrasts %>% as.data.frame()

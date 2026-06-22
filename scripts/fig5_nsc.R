@@ -97,8 +97,8 @@ df.sugars_nest = df.sugars |>
         "glucose_mg_g",
         "starch_mg_g",
         "sucrose_mg_g",
-        "total_sugars_mg_g",
-        "starch_sugar_ratio"
+        "total_sugars_mg_g"
+        # "starch_sugar_ratio"
       )
   ) |>
   nest(data = -c(sugar_name))
@@ -136,10 +136,10 @@ df.sugars_nest = df.sugars_nest |>
 
 df.sugars_nest = df.sugars_nest |>
   mutate(
-    emm = map(
+    emm_plot = map(
       emm,
       ~ .x |> multcomp::cld(Letters = letters) |> as.data.frame(),
-      emm = map(
+      emm_plot = map(
         emm,
         ~ .x |>
           mutate(
@@ -162,11 +162,11 @@ df.sugars_emm = df.sugars_nest |>
   mutate(
     data_emm = map2(
       .x = data,
-      .y = emm,
+      .y = emm_plot,
       ~ left_join(.x, .y, by = c("species", "date_fac", "year"))
     )
   ) |>
-  select(sugar_name, data_emm) |>
+  dplyr::select(c(sugar_name, data_emm)) |>
   unnest(data_emm)
 
 write_csv(
@@ -174,8 +174,14 @@ write_csv(
   "data/calculated_parameters/df_sugars_emmeans.csv"
 )
 
+write_rds(
+  df.sugars_nest |> select(data, sugar_name, emm, emm_plot),
+  "output/emmeans/emm_nsc.rds"
+)
 
-# plot --------------------------------------------------------------------
+# 4. plot --------------------------------------------------------------------
+
+## 4.1 plot over leaf age ------------------------------------------------------------
 
 df.sugars_emm = read_csv("data/calculated_parameters/df_sugars_emmeans.csv")
 
@@ -188,8 +194,8 @@ df.plot = df.sugars_emm |>
       "FREX" = "*Fraxinus excelsior*"
     ),
     pred_val = emmean,
-    lower_lim = asymp.LCL,
-    upper_lim = asymp.UCL,
+    lower_lim = lower.CL,
+    upper_lim = upper.CL,
     # group_y = case_when(year == "2023" ~ group_y + 0.2, T ~ group_y)
   )
 
@@ -200,8 +206,8 @@ sugar_labels_xml <- c(
   "glucose_mg_g" = "Glucose (mg g<sup>−1</sup>)",
   "starch_mg_g" = "Starch (mg g<sup>−1</sup>)",
   "sucrose_mg_g" = "Sucrose (mg g<sup>−1</sup>)",
-  "total_sugars_mg_g" = "Total Sugars (mg g<sup>−1</sup>)",
-  "starch_sugar_ratio" = "Starch:Sucrose Ratio"
+  "total_sugars_mg_g" = "Total Sugars (mg g<sup>−1</sup>)"
+  # "starch_sugar_ratio" = "Starch:Sucrose Ratio"
 )
 
 df.plot_dummy_limits = df.plot |>
@@ -277,7 +283,7 @@ fig5_nsc.png =
 fig5_nsc.png
 
 ggsave(
-  filename = "publication_figures/fig5_nsc.png",
+  filename = "figures/fig5_nsc.png",
   fig5_nsc.png,
   width = 30,
   height = 16,
@@ -285,104 +291,117 @@ ggsave(
 )
 
 
-# emmeans ----------------------------------------------------------------
+## 4.2 plot over date ------------------------------------------------------------
 
-test = df.sugars_nest$emm[[1]] |> as.emmGrid()
-pairs_test = test |> pairs() |> as.data.frame()
-pairs_test ## all combinations in reference to baseline, way too many
+df.sugars_emm = read_csv("data/calculated_parameters/df_sugars_emmeans.csv")
 
-df.sugars_nest$emm[[1]] |> contrast()
-df.sugars_nest$emm[[1]] |> pairs()
-df.sugars_nest$emm[[1]] |> regrid()
-
-df.sugars_nest$data[[1]]
-
-# only keep sensible combinations, i.e., species at the same date, within species across dates
-# Assuming df.sugars_nest contains your nested data
-library(emmeans)
-library(dplyr)
-
-# Extract the emmGrid object
-test <- df.sugars_nest$emm[[1]] |> as.emmGrid()
-
-# Create pairwise comparisons for species within each date
-test |>
-  emmeans(pairwise ~ species | date_fac) |>
-  pluck("contrasts") |>
-  as.data.frame()
-
-test |>
-  emmeans(pairwise ~ species | date_fac) |>
-  pluck("emmeans") |>
-  as.data.frame()
-
-# Create pairwise comparisons for dates within each species
-test |>
-  emmeans(pairwise ~ date_fac | species | year) |>
-  pluck("emmeans") |>
-  as.data.frame() |>
-  flextable() |>
-  ft_theme()
-
-
-emm <- emmeans(test, ~ species | date_fac)
-
-# means
-means_df <- as.data.frame(emm)
-
-# contrasts
-contr_df <- contrast(emm, "pairwise") |>
-  as.data.frame()
-
-contr_with_means <- contr_df |>
-  # as.data.frame() |>
-  separate(contrast, into = c("FASY", "FREX"), sep = " - ") |>
-  left_join(means_df, by = c("FASY" = "species", "date_fac", "year")) |>
-  rename(mean1 = emmean) |>
-  left_join(means_df, by = c("FASY" = "species", "date_fac", "year")) |>
-  rename(mean2 = emmean)
-contr_with_means
-
-expSup <- function(x, digits = 3) {
-  sprintf(
-    paste0("%03.", digits, "f x 10^%d^"),
-    x / 10^floor(log10(abs(x))),
-    floor(log10(abs(x)))
-  )
-}
-
-test |>
-  emmeans(pairwise ~ species | date_fac) |>
-  pluck("contrasts") |>
-  as.data.frame() |>
-  rbind(
-    test |>
-      emmeans(pairwise ~ date_fac | species | year) |>
-      pluck("contrasts") |>
-      as.data.frame()
-  ) |>
+df.plot = df.sugars_emm |>
   mutate(
-    p.value = expSup(p.value)
-  ) |>
-  # Create pairwise comparisons for dates within each species
-  flextable() |>
-  ft_theme()
+    Date = as.Date(date_fac),
+    Year = year(date_fac) |> as.factor(),
+    Species = recode(
+      species,
+      "FASY" = "*Fagus sylvatica*",
+      "FREX" = "*Fraxinus excelsior*"
+    ),
+    pred_val = emmean,
+    lower_lim = lower.CL,
+    upper_lim = upper.CL,
+    # group_y = case_when(year == "2023" ~ group_y + 0.2, T ~ group_y)
+  )
 
-# Combine the contrasts
-all_contrasts <- list(
-  species_date_contrasts,
-  date_species_contrasts
+year(df.plot$Date) = 2000
+
+sugar_labels_xml <- c(
+  "fructose_mg_g" = "Fructose (mg g<sup>−1</sup>)",
+  "glucose_mg_g" = "Glucose (mg g<sup>−1</sup>)",
+  "starch_mg_g" = "Starch (mg g<sup>−1</sup>)",
+  "sucrose_mg_g" = "Sucrose (mg g<sup>−1</sup>)",
+  "total_sugars_mg_g" = "Total Sugars (mg g<sup>−1</sup>)"
+  # "starch_sugar_ratio" = "Starch:Sucrose Ratio"
 )
 
-# Convert the contrasts to data frames
-species_date_pairs <- species_date_contrasts |> as.data.frame()
-date_species_pairs <- date_species_contrasts |> as.data.frame()
+df.plot_dummy_limits = df.plot |>
+  group_by(sugar_name) |>
+  reframe(
+    min_y = case_when(
+      min(sugar_conc) > 0 & max(sugar_conc) < 0.5 ~ 0,
+      T ~ min(sugar_conc / 2 |> trunc()) |> floor() * 2
+    ),
+    max_y = case_when(
+      min(sugar_conc) > 0 & max(sugar_conc) < 0.5 ~ 0.5,
+      T ~ max(sugar_conc / 2 |> trunc()) |> ceiling() * 2
+    ),
+  ) |>
+  pivot_longer(cols = c("min_y":"max_y"), values_to = "y") |>
+  mutate(
+    x = rep(as.Date(c("2000-05-15", "2000-09-30")), length(unique(sugar_name))),
+    species = "*Fagus sylvatica*",
+    Year = "2023"
+  )
 
-# Display the results
-species_date_pairs
-date_species_pairs
+fig5_nsc.png =
+  ggplot(
+    df.plot,
+    aes(
+      x = Date,
+      col = Species,
+      linetype = Year
+    )
+  ) +
+  geom_point(
+    aes(y = sugar_conc),
+    alpha = plot_specs$plot_alpha,
+    position = position_dodge(width = 2),
+    show.legend = T
+  ) +
+  geom_line(
+    aes(y = pred_val),
+    alpha = plot_specs$plot_alpha,
+    position = position_dodge(width = 2),
+    show.legend = F
+  ) +
+  geom_errorbar(
+    aes(ymin = lower_lim, ymax = upper_lim),
+    alpha = plot_specs$plot_alpha,
+    width = 3,
+    position = position_dodge(width = 2),
+    show.legend = T
+  ) +
+  geom_blank(
+    data = df.plot_dummy_limits,
+    aes(x = x, y = y),
+    inherit.aes = FALSE,
+    position = position_dodge(width = 2),
+    show.legend = FALSE
+  ) +
+  scale_color_oi(order = c(6, 2)) +
+  scale_x_date(limits = as.Date(c("2000-05-15", "2000-09-30"))) +
+  facet_wrap(
+    ~sugar_name,
+    scales = "free_y",
+    strip.position = "top",
+    labeller = labeller(sugar_name = as_labeller(sugar_labels_xml))
+  ) +
+  labs(
+    y = NULL,
+    x = "Date",
+  ) +
+  thesis_theme +
+  theme(
+    strip.text = ggtext::element_markdown(),
+    strip.background = element_blank(),
+    strip.placement = "outside",
+    legend.text = ggtext::element_markdown(),
+  )
 
-test |>
-  multcomp::cld(Letters = letters)
+fig5_nsc.png
 
-test |> pairs() |> as.data.frame() |> nrow()
+ggsave(
+  filename = "figures/fig5_nsc_date.png",
+  fig5_nsc.png,
+  width = 30,
+  height = 16,
+  units = "cm"
+)
+

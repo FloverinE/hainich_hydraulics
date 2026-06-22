@@ -639,9 +639,9 @@ df_meteo_fluxes_2023_2024 <- df_meteo_2023_2024 |>
   left_join(df_fluxes_2023_2024, by = "timestamp")
 
 df_meteo_2000_2023 <- data.table::fread(
-  "data/microclimate/FLX_DE-Hai_FLUXNET2015_FULLSET_HH_2000-2023_1-3.csv"
+  "data/microclimate_old/FLX_DE-Hai_FLUXNET2015_FULLSET_HH_2000-2023_1-3.csv"
 ) |>
-  clean_names() |>
+  janitor::clean_names() |>
   mutate(
     timestamp_start = timestamp_start |>
       as.character() |>
@@ -1059,7 +1059,7 @@ write.csv(
 ## meteo long term ---------------------------------------------------------
 
 df_meteo_2000_2023 <- data.table::fread(
-  "data/Meteorology_tower/FLX_DE-Hai_FLUXNET2015_FULLSET_HH_2000-2023_1-3.csv"
+  "data/microclimate_new_2026//FLX_DE-Hai_FLUXNET2015_FULLSET_HH_2000-2023_1-3.csv"
 ) |>
   clean_names() |>
   mutate(
