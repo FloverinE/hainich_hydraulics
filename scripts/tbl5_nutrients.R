@@ -64,6 +64,7 @@ df.nutrients_emm$nutrient_name |> unique()
 # [1] "k_mg_kg"  "mg_mg_kg" "p_mg_kg"  "s_mg_kg"  "c"        "n"
 
 df.nutrients_emm$caption = c(
+  "Calcium [mg kg-1]",
   "Potassium [mg kg-1]",
   "Magnesium [mg kg-1]",
   "Phosphorus [mg kg-1]",
@@ -72,7 +73,7 @@ df.nutrients_emm$caption = c(
   "Nitrogen [%]"
 )
 
-for (i in 1:6) {
+for (i in 1:7) {
   ft = f.emm2flextable(
     emm = df.nutrients_emm$emm[[i]],
     species_var = "species",
@@ -87,7 +88,7 @@ for (i in 1:6) {
   print(i)
 }
 
-for (i in 1:6) {
+for (i in 1:7) {
   ft = f.emm2flextable_species(
     emm = df.nutrients_emm$emm[[i]],
     species_var = "species",
@@ -116,7 +117,10 @@ for(i in 1:length(df.tables$table)){
 
 print(doc, target =  "tables/nutrient_contrasts.docx")
 
-# Tables for LME coefficients ----------------------------------------------------------
+
+# dump --------------------------------------------------------------------
+
+## Tables for LME coefficients ----------------------------------------------------------
 
 nutrient_list = df.nutrients_emm$nutrient_name |> unique()
 nutrient_numbers = seq(1, length(nutrient_list))
@@ -142,7 +146,7 @@ for (i in seq_along(nutrient_list)) {
   )
 }
 
-# Tables for emmeans results ----------------------------------------------
+## Tables for emmeans results ----------------------------------------------
 
 df.nutrients_table$nutrient_name |> unique()
 
@@ -172,4 +176,4 @@ for (i in seq_along(nutrient_list)) {
   print(i)
 }
 
-# Tables for emmeans contrasts ---------------------------------------------
+## Tables for emmeans contrasts ---------------------------------------------

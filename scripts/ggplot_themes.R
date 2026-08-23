@@ -31,10 +31,11 @@ thesis_theme <- theme_bw() +
   theme(
     legend.position = "bottom",
     legend.spacing.x = unit(0.7, 'cm'),
+    plot.tag.position = c(0.01, 0.99),
     # aspect.ratio = 1,
     axis.text = element_text(size = 10),
-    axis.title.x = element_text(size = 10),
-    # axis.title.y = element_text(size = 10),
+    axis.title.x = element_text(size = 12),
+    axis.title.y = element_text(size = 12),
     legend.title = element_text(size = 10),
     legend.text = element_text(size = 10),
     legend.key.width = unit(1, "cm", data = NULL),

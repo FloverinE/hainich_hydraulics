@@ -3,6 +3,7 @@
 library(tidyverse)
 library(flextable)
 library(multcompView)
+library(officer)
 library(emmeans)
 source("scripts/ggplot_themes.R") ## this also has the flextable theme
 source("scripts/helper_functions.R")
@@ -156,7 +157,7 @@ for (i in 12:14) {
 # Tables for species comparisons  ----------------------------------------
 
 f.emm2flextable_species(
-  emm = df.hydr_traits_emm$emm[[12]],
+  emm = df.hydr_traits_emm$emm[[1]],
   species_var = "species",
   date_var = "date_fac",
   year_var = "year",
@@ -203,7 +204,6 @@ for (i in 12:14) {
   print(i)
 }
 
-# 
 # for (i in 12:14) {
 #   ft = f.emm2flextable_species_wo_year(
 #     emm = df.hydr_traits_emm$emm[[i]],
@@ -225,7 +225,7 @@ for (i in 12:14) {
 # }
 
 
-## merge tables ------------------------------------------------------------
+# merge tables ------------------------------------------------------------
 
 df.tables = data.frame(table = ls(pattern = "ft\\.")) 
 
@@ -237,9 +237,12 @@ for(i in 1:length(df.tables$table)){
     body_add_par("\n")
 }
 
-print(doc, target =  "tables/test.docx")
+print(doc, target =  "tables/trait_contrasts.docx")
 
-# Tables for LME coefficients ----------------------------------------------------------
+
+# dump --------------------------------------------------------------------
+
+## Tables for LME coefficients ----------------------------------------------------------
 
 trait_list = df.hydr_traits_emm$trait |> unique()
 trait_numbers = seq(1, length(trait_list))
@@ -288,7 +291,7 @@ f.lme2flextable(
 )
 
 
-# Tables for emmeans results ----------------------------------------------
+## Tables for emmeans results ----------------------------------------------
 
 df.hydr_traits_table$trait |> unique()
 

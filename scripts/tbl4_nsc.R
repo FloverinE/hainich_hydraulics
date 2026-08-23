@@ -17,8 +17,8 @@ df.sugars_table = read_csv(
   "data/calculated_parameters/df_sugars_emmeans.csv"
 ) |>
   mutate(
-    "lower CL" = lower.CL,
-    "upper CL" = upper.CL,
+    "lower CL" = asymp.LCL,
+    "upper CL" = asymp.UCL,
     "CL type" = "asymp.",
     .group = .group |> str_remove_all("\\s")
   ) |>
@@ -119,7 +119,11 @@ for(i in 1:length(df.tables$table)){
 
 print(doc, target =  "tables/nsc_contrasts.docx")
 
-# Tables for LME coefficients ----------------------------------------------------------
+
+# dump --------------------------------------------------------------------
+
+
+## Tables for LME coefficients ----------------------------------------------------------
 
 sugar_list = df.sugars_emm$sugar_name |> unique()
 sugar_numbers = seq(1, length(sugar_list))
@@ -145,7 +149,7 @@ for (i in seq_along(sugar_list)) {
   )
 }
 
-# Tables for emmeans results ----------------------------------------------
+## Tables for emmeans results ----------------------------------------------
 
 df.sugars_table$sugar_name |> unique()
 
@@ -175,4 +179,4 @@ for (i in seq_along(sugar_list)) {
   print(i)
 }
 
-# Tables for emmeans contrasts ---------------------------------------------
+## Tables for emmeans contrasts ---------------------------------------------
