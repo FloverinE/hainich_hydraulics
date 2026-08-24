@@ -22,11 +22,10 @@ f.emm2flextable <- function(
   caption_txt = NULL,
   theme_fun = ft_theme
 ) {
-
   specs <- as.formula(
     paste0("pairwise ~ ", date_var, " | ", species_var, " * ", year_var)
   )
-  has_na = case_when(
+  has_na <- case_when(
     as.data.frame(emm)$emmean |> is.na() |> sum() > 1 ~ T,
     T ~ F
   )
@@ -38,7 +37,7 @@ f.emm2flextable <- function(
     # all rows are estimable → safe to call regrid()
     emm <- regrid(emm)
   }
-  
+
   pw <- emmeans(emm, specs, type = "response")
 
   contr <- pw$contrasts %>% as.data.frame()
@@ -68,7 +67,7 @@ f.emm2flextable <- function(
     left_join(emmean %>% select(-ident1), by = "ident2") %>%
     rename(`Response 2` = any_of(c("emmean", "response"))) |>
     mutate(`Diff. (%)` = (`Response 1` - `Response 2`) / `Response 1`) %>%
-    rename(`t.ratio` = any_of(c("t.ratio", "z.ratio"))) |>
+    # rename(`z.ratio` = any_of(c("t.ratio", "z.ratio"))) |>
     select(
       !!sym(species_var),
       !!sym(year_var),
@@ -79,12 +78,12 @@ f.emm2flextable <- function(
       estimate,
       `Diff. (%)`,
       df,
-      t.ratio,
+      z.ratio,
       p.value
     ) %>%
     mutate(
       across(
-        c(estimate, `Diff. (%)`, `Response 1`, `Response 2`, t.ratio),
+        c(estimate, `Diff. (%)`, `Response 1`, `Response 2`, z.ratio),
         ~ f.round(.x, digits)
       ),
       p.value = f.p_value_bins(p.value)
@@ -158,7 +157,7 @@ f.emm2flextable_wo_year <- function(
     left_join(emmean %>% select(-c(ident1, date_fac)), by = "ident2") %>%
     rename(`Response 2` = any_of(c("emmean", "response"))) %>%
     mutate(`Diff. (%)` = (`Response 1` - `Response 2`) / `Response 1`) %>%
-    rename(`t.ratio` = any_of(c("t.ratio", "z.ratio"))) %>%
+    # rename(`t.ratio` = any_of(c("t.ratio", "z.ratio"))) %>%
     select(
       !!sym(species_var),
       # !!sym(date_var),
@@ -169,12 +168,12 @@ f.emm2flextable_wo_year <- function(
       estimate,
       `Diff. (%)`,
       df,
-      t.ratio,
+      z.ratio,
       p.value
     ) %>%
     mutate(
       across(
-        c(estimate, `Diff. (%)`, `Response 1`, `Response 2`, t.ratio),
+        c(estimate, `Diff. (%)`, `Response 1`, `Response 2`, z.ratio),
         ~ f.round(.x, digits)
       ),
       p.value = f.p_value_bins(p.value)
@@ -207,10 +206,10 @@ f.emm2flextable_species_wo_year <- function(
   caption_txt = NULL,
   theme_fun = ft_theme
 ) {
-  specs = as.formula(
+  specs <- as.formula(
     paste0("pairwise ~ ", species_var, " | ", date_var)
   )
-  has_na = case_when(
+  has_na <- case_when(
     as.data.frame(emm)$emmean |> is.na() |> sum() > 1 ~ T,
     T ~ F
   )
@@ -254,7 +253,7 @@ f.emm2flextable_species_wo_year <- function(
     mutate(
       `Diff. (%)` = (`Response FASY` - `Response FREX`) / `Response FASY`,
     ) %>%
-    rename(`t.ratio` = any_of(c("t.ratio", "z.ratio"))) |>
+    # rename(`t.ratio` = any_of(c("t.ratio", "z.ratio"))) |>
     select(
       date_fac,
       `Response FASY`,
@@ -262,12 +261,12 @@ f.emm2flextable_species_wo_year <- function(
       estimate,
       `Diff. (%)`,
       df,
-      t.ratio,
+      z.ratio,
       p.value
     ) %>%
     mutate(
       across(
-        c(estimate, `Diff. (%)`, `Response FASY`, `Response FREX`, t.ratio),
+        c(estimate, `Diff. (%)`, `Response FASY`, `Response FREX`, z.ratio),
         ~ f.round(.x, digits)
       ),
       p.value = f.p_value_bins(p.value)
@@ -300,10 +299,10 @@ f.emm2flextable_species <- function(
   caption_txt = NULL,
   theme_fun = ft_theme
 ) {
-  specs = as.formula(
+  specs <- as.formula(
     paste0("pairwise ~ ", species_var, " | ", date_var, " * ", year_var)
   )
-  has_na = case_when(
+  has_na <- case_when(
     as.data.frame(emm)$emmean |> is.na() |> sum() > 1 ~ T,
     T ~ F
   )
@@ -347,7 +346,7 @@ f.emm2flextable_species <- function(
     mutate(
       `Diff. (%)` = (`Response FASY` - `Response FREX`) / `Response FASY`,
     ) %>%
-    rename(`t.ratio` = any_of(c("t.ratio", "z.ratio"))) |>
+    # rename(`t.ratio` = any_of(c("t.ratio", "z.ratio"))) |>
     select(
       # !!sym(species_var),
       !!sym(year_var),
@@ -359,12 +358,12 @@ f.emm2flextable_species <- function(
       estimate,
       `Diff. (%)`,
       df,
-      t.ratio,
+      z.ratio,
       p.value
     ) %>%
     mutate(
       across(
-        c(estimate, `Diff. (%)`, `Response FASY`, `Response FREX`, t.ratio),
+        c(estimate, `Diff. (%)`, `Response FASY`, `Response FREX`, z.ratio),
         ~ f.round(.x, digits)
       ),
       p.value = f.p_value_bins(p.value)

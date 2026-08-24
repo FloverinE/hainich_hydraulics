@@ -11,40 +11,40 @@ source("scripts/helper_functions.R")
 # nested dataframes with emmeans grid objects
 df.hydr_traits_emm = read_rds("output/emmeans/emm_hydr_traits.rds")
 
-df.hydr_traits_table = read_csv(
-  "data/calculated_parameters/df_hydr_traits_emmeans.csv"
-) |>
-  mutate(
-    "lower CL" = case_when(is.na(asymp.LCL) ~ lower.CL, T ~ asymp.LCL),
-    "upper CL" = case_when(is.na(asymp.UCL) ~ upper.CL, T ~ asymp.UCL),
-    "CL type" = case_when(is.na(lower.CL) ~ "asymp.", T ~ "standard"),
-    .group = .group |> str_remove_all("\\s")
-  ) |>
-  select(
-    year,
-    date_fac,
-    species,
-    sample_id,
-    trait_value,
-    emmean,
-    SE,
-    `lower CL`,
-    `upper CL`,
-    `CL type`,
-    .group,
-    trait
-  ) |>
-  mutate(year = as.factor(year), across(emmean:`upper CL`, ~ round(.x, 3))) |>
-  rename(
-    "Year" = "year",
-    "Date" = "date_fac",
-    "Species" = "species",
-    "Tree ID" = "sample_id",
-    "Meas. value" = "trait_value",
-    "Est. mean" = "emmean",
-    "Std. error" = "SE",
-    "Sign. group" = ".group"
-  )
+# df.hydr_traits_table = read_csv(
+#   "data/calculated_parameters/df_hydr_traits_emmeans.csv"
+# ) |>
+#   mutate(
+#     "lower CL" = case_when(is.na(asymp.LCL) ~ lower.CL, T ~ asymp.LCL),
+#     "upper CL" = case_when(is.na(asymp.UCL) ~ upper.CL, T ~ asymp.UCL),
+#     "CL type" = case_when(is.na(lower.CL) ~ "asymp.", T ~ "standard"),
+#     .group = .group |> str_remove_all("\\s")
+#   ) |>
+#   select(
+#     year,
+#     date_fac,
+#     species,
+#     sample_id,
+#     trait_value,
+#     emmean,
+#     SE,
+#     `lower CL`,
+#     `upper CL`,
+#     `CL type`,
+#     .group,
+#     trait
+#   ) |>
+#   mutate(year = as.factor(year), across(emmean:`upper CL`, ~ round(.x, 3))) |>
+#   rename(
+#     "Year" = "year",
+#     "Date" = "date_fac",
+#     "Species" = "species",
+#     "Tree ID" = "sample_id",
+#     "Meas. value" = "trait_value",
+#     "Est. mean" = "emmean",
+#     "Std. error" = "SE",
+#     "Sign. group" = ".group"
+#   )
 
 
 # Tables for emmeans contrasts ---------------------------------------------

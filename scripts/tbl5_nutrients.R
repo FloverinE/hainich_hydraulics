@@ -11,40 +11,40 @@ source("scripts/helper_functions.R")
 # nested dataframes with emmeans grid objects
 df.nutrients_emm = read_rds("output/emmeans/emm_nutrients.rds")
 
-df.nutrients_table = read_csv(
-  "data/calculated_parameters/df_nutrients_emmeans.csv"
-) |>
-  mutate(
-    "lower CL" = lower.CL,
-    "upper CL" = upper.CL,
-    "CL type" = "asymp.",
-    .group = .group |> str_remove_all("\\s")
-  ) |>
-  select(
-    year,
-    date_fac,
-    species,
-    sample_id,
-    nutrient_conc,
-    emmean,
-    SE,
-    `lower CL`,
-    `upper CL`,
-    `CL type`,
-    .group,
-    nutrient_name
-  ) |>
-  mutate(year = as.factor(year), across(emmean:`upper CL`, ~ round(.x, 3))) |>
-  rename(
-    "Year" = "year",
-    "Date" = "date_fac",
-    "Species" = "species",
-    "Tree ID" = "sample_id",
-    "Meas. value" = "nutrient_conc",
-    "Est. mean" = "emmean",
-    "Std. error" = "SE",
-    "Sign. group" = ".group"
-  )
+# df.nutrients_table = read_csv(
+#   "data/calculated_parameters/df_nutrients_emmeans.csv"
+# ) |>
+#   mutate(
+#     "lower CL" = lower.CL,
+#     "upper CL" = upper.CL,
+#     "CL type" = "asymp.",
+#     .group = .group |> str_remove_all("\\s")
+#   ) |>
+#   select(
+#     year,
+#     date_fac,
+#     species,
+#     sample_id,
+#     nutrient_conc,
+#     emmean,
+#     SE,
+#     `lower CL`,
+#     `upper CL`,
+#     `CL type`,
+#     .group,
+#     nutrient_name
+#   ) |>
+#   mutate(year = as.factor(year), across(emmean:`upper CL`, ~ round(.x, 3))) |>
+#   rename(
+#     "Year" = "year",
+#     "Date" = "date_fac",
+#     "Species" = "species",
+#     "Tree ID" = "sample_id",
+#     "Meas. value" = "nutrient_conc",
+#     "Est. mean" = "emmean",
+#     "Std. error" = "SE",
+#     "Sign. group" = ".group"
+#   )
 
 
 # Tables for emmeans contrasts ---------------------------------------------

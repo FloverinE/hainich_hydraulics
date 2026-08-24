@@ -12,40 +12,40 @@ source("scripts/helper_functions.R")
 
 df.hsm_emm = read_rds("output/emmeans/df_hsm_emmeans.Rds")
 
-df.hsm_table = read_csv(
-  "data/calculated_parameters/df_hsm_emmeans.csv"
-) |>
-  mutate(
-    "lower CL" = lower.CL,
-    "upper CL" = upper.CL,
-    "CL type" = "standard",
-    .group = .group |> str_remove_all("\\s")
-  ) |>
-  select(
-    year,
-    date_fac,
-    species,
-    sample_id,
-    hsm_mpa,
-    emmean,
-    SE,
-    `lower CL`,
-    `upper CL`,
-    `CL type`,
-    .group,
-    threshold
-  ) |>
-  mutate(year = as.factor(year), across(emmean:`upper CL`, ~ round(.x, 3))) |>
-  rename(
-    "Year" = "year",
-    "Date" = "date_fac",
-    "Species" = "species",
-    "Tree ID" = "sample_id",
-    "Meas. value" = "hsm_mpa",
-    "Est. mean" = "emmean",
-    "Std. error" = "SE",
-    "Sign. group" = ".group"
-  )
+# df.hsm_table = read_csv(
+#   "data/calculated_parameters/df_hsm_emmeans.csv"
+# ) |>
+#   mutate(
+#     "lower CL" = lower.CL,
+#     "upper CL" = upper.CL,
+#     "CL type" = "standard",
+#     .group = .group |> str_remove_all("\\s")
+#   ) |>
+#   select(
+#     year,
+#     date_fac,
+#     species,
+#     sample_id,
+#     hsm_mpa,
+#     emmean,
+#     SE,
+#     `lower CL`,
+#     `upper CL`,
+#     `CL type`,
+#     .group,
+#     threshold
+#   ) |>
+#   mutate(year = as.factor(year), across(emmean:`upper CL`, ~ round(.x, 3))) |>
+#   rename(
+#     "Year" = "year",
+#     "Date" = "date_fac",
+#     "Species" = "species",
+#     "Tree ID" = "sample_id",
+#     "Meas. value" = "hsm_mpa",
+#     "Est. mean" = "emmean",
+#     "Std. error" = "SE",
+#     "Sign. group" = ".group"
+#   )
 
 
 # Tables for emmeans contrasts ---------------------------------------------
