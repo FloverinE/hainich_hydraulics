@@ -13,40 +13,40 @@ source("scripts/helper_functions.R")
 
 df.sugars_emm <- read_rds("output/emmeans/emm_nsc.rds")
 
-df.sugars_table <- read_csv(
-  "data/calculated_parameters/df_sugars_emmeans.csv"
-) |>
-  mutate(
-    "lower CL" = asymp.LCL,
-    "upper CL" = asymp.UCL,
-    "CL type" = "asymp.",
-    .group = .group |> str_remove_all("\\s")
-  ) |>
-  select(
-    year,
-    date_fac,
-    species,
-    sample_id,
-    sugar_conc,
-    emmean,
-    SE,
-    `lower CL`,
-    `upper CL`,
-    `CL type`,
-    .group,
-    sugar_name
-  ) |>
-  mutate(year = as.factor(year), across(emmean:`upper CL`, ~ round(.x, 3))) |>
-  rename(
-    "Year" = "year",
-    "Date" = "date_fac",
-    "Species" = "species",
-    "Tree ID" = "sample_id",
-    "Meas. value" = "sugar_conc",
-    "Est. mean" = "emmean",
-    "Std. error" = "SE",
-    "Sign. group" = ".group"
-  )
+# df.sugars_table <- read_csv(
+#   "data/calculated_parameters/df_sugars_emmeans.csv"
+# ) |>
+#   mutate(
+#     "lower CL" = asymp.LCL,
+#     "upper CL" = asymp.UCL,
+#     "CL type" = "asymp.",
+#     .group = .group |> str_remove_all("\\s")
+#   ) |>
+#   select(
+#     year,
+#     date_fac,
+#     species,
+#     sample_id,
+#     sugar_conc,
+#     emmean,
+#     SE,
+#     `lower CL`,
+#     `upper CL`,
+#     `CL type`,
+#     .group,
+#     sugar_name
+#   ) |>
+#   mutate(year = as.factor(year), across(emmean:`upper CL`, ~ round(.x, 3))) |>
+#   rename(
+#     "Year" = "year",
+#     "Date" = "date_fac",
+#     "Species" = "species",
+#     "Tree ID" = "sample_id",
+#     "Meas. value" = "sugar_conc",
+#     "Est. mean" = "emmean",
+#     "Std. error" = "SE",
+#     "Sign. group" = ".group"
+#   )
 
 
 # Tables for emmeans contrasts ---------------------------------------------
