@@ -9,9 +9,9 @@ source("scripts/ggplot_themes.R") ## this also has the flextable theme
 source("scripts/helper_functions.R")
 
 # nested dataframes with emmeans grid objects
-df.nutrients_emm = read_rds("output/emmeans/emm_nutrients.rds")
+df.nutrients_emm <- read_rds("output/emmeans/emm_nutrients.rds")
 
-df.nutrients_table = read_csv(
+df.nutrients_table <- read_csv(
   "data/calculated_parameters/df_nutrients_emmeans.csv"
 ) |>
   mutate(
@@ -54,16 +54,16 @@ f.emm2flextable(
   species_var = "species",
   date_var = "date_fac",
   year_var = "year",
-  digits = 3,
+  digits = 2,
   caption_txt = "",
   theme_fun = ft_theme
 )
 
-table_paths = "tables/04_nutrients/emmeans_contrasts/"
+table_paths <- "tables/04_nutrients/emmeans_contrasts/"
 df.nutrients_emm$nutrient_name |> unique()
 # [1] "k_mg_kg"  "mg_mg_kg" "p_mg_kg"  "s_mg_kg"  "c"        "n"
 
-df.nutrients_emm$caption = c(
+df.nutrients_emm$caption <- c(
   "Calcium [mg kg-1]",
   "Potassium [mg kg-1]",
   "Magnesium [mg kg-1]",
@@ -74,61 +74,90 @@ df.nutrients_emm$caption = c(
 )
 
 for (i in 1:7) {
-  ft = f.emm2flextable(
+  ft <- f.emm2flextable(
     emm = df.nutrients_emm$emm[[i]],
     species_var = "species",
     date_var = "date_fac",
     year_var = "year",
-    digits = 3,
+    digits = 2,
     caption_txt = df.nutrients_emm$caption[i],
     theme_fun = ft_theme
   )
-  obj_name = paste0("ft.", df.nutrients_emm$caption[[i]])
-  assign(x =obj_name, value =  ft)
+  obj_name <- paste0("ft.", df.nutrients_emm$caption[[i]])
+  assign(x = obj_name, value = ft)
   print(i)
 }
 
 for (i in 1:7) {
-  ft = f.emm2flextable_species(
+  ft <- f.emm2flextable_species(
     emm = df.nutrients_emm$emm[[i]],
     species_var = "species",
     date_var = "date_fac",
     year_var = "year",
-    digits = 3,
+    digits = 2,
     caption_txt = df.nutrients_emm$caption[i],
     theme_fun = ft_theme
   )
-  obj_name = paste0("ft.", df.nutrients_emm$caption[[i]], "_species_comp")
-  assign(x =obj_name, value =  ft)
+  obj_name <- paste0("ft.", df.nutrients_emm$caption[[i]], "_species_comp")
+  assign(x = obj_name, value = ft)
   print(i)
 }
 
 # merge tables ------------------------------------------------------------
 
-df.tables = data.frame(table = ls(pattern = "ft\\.")) 
+# df.tables <- data.frame(table = ls(pattern = "ft\\.")) |>
+#   mutate(
+#     caption = table |>
+#       str_remove_all("ft\\.") |>
+#       str_remove_all("_species_comp")
+#   ) |>
+#   left_join(
+#     df.nutrients_emm |> select(nutrient_name, caption),
+#     by = "caption"
+#   )
 
-doc = read_docx()
+df.tables <- data.frame(table = ls(pattern = "ft\\.")) |>
+  mutate(
+    caption = table |>
+      str_remove_all("ft\\.") |>
+      str_remove_all("_species_comp")
+  ) |>
+  left_join(
+    df.nutrients_emm |> select(nutrient_name, caption),
+    by = "caption"
+  ) |>
+  mutate(
+    nutrient_name = case_when(
+      table |> str_detect("species") ~ paste0(
+        nutrient_name,
+        "_species_comp"
+      ),
+      T ~ nutrient_name
+    )
+  )
 
-for(i in 1:length(df.tables$table)){
+for (i in 1:length(df.tables$table)) {
+  filename <- paste0("tables/04_nutrients/", df.tables$nutrient_name[i], ".png")
+  get(df.tables[i, 1]) |>
+    set_caption(df.tables[i, 2]) |>
+    save_as_image(filename)
+  print(i)
   # for(i in 1:10){ ## test
-  doc = doc |> body_add_flextable(get(df.tables$table[[i]]))  |> 
-    body_add_par("\n")
+  # doc = doc |> body_add_flextable(get(df.tables$table[[i]]))  |>
+  #   body_add_par("\n")
 }
-
-print(doc, target =  "tables/nutrient_contrasts.docx")
-
 
 # dump --------------------------------------------------------------------
 
 ## Tables for LME coefficients ----------------------------------------------------------
 
-nutrient_list = df.nutrients_emm$nutrient_name |> unique()
-nutrient_numbers = seq(1, length(nutrient_list))
+nutrient_list <- df.nutrients_emm$nutrient_name |> unique()
+nutrient_numbers <- seq(1, length(nutrient_list))
 
 for (i in seq_along(nutrient_list)) {
-  nutrient_sel = nutrient_list[i]
-  caption = nutrient_sel
-  num = nutrient_numbers[i]
+  nutrient_sel <- nutrient_list[i]
+  caption <- nutrient_sel
+  num <- nutrient_numbers[i]
 
   try(
     as_flextable(df.nutrients_nest$lme[[i]], add.random = T) |>
@@ -151,17 +180,17 @@ for (i in seq_along(nutrient_list)) {
 df.nutrients_table$nutrient_name |> unique()
 
 # Create a numbered list of nutrients
-nutrient_list = df.nutrients_table$nutrient_name |> unique()
-nutrient_numbers = seq(1, length(nutrient_list))
+nutrient_list <- df.nutrients_table$nutrient_name |> unique()
+nutrient_numbers <- seq(1, length(nutrient_list))
 
 # Loop through each nutrient and create the flextable
 for (i in seq_along(nutrient_list)) {
-  nutrient_sel = nutrient_list[i]
-  caption = nutrient_sel
-  num = nutrient_numbers[i]
+  nutrient_sel <- nutrient_list[i]
+  caption <- nutrient_sel
+  num <- nutrient_numbers[i]
 
   # Create flextable for the current nutrient
-  ft = df.nutrients_table |>
+  ft <- df.nutrients_table |>
     ungroup() |>
     filter(nutrient_name == nutrient_sel) |>
     select(-c(nutrient_name, `CL type`))
